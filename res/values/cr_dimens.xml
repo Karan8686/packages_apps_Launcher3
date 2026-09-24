@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) 2016-2025 crDroid Android Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+<resources>
+
+    <!-- Material Expressive -->
+    <dimen name="dashboard_tile_image_size">40dp</dimen>
+    <dimen name="dashboard_tile_foreground_image_size">24dp</dimen>
+    <dimen name="dashboard_tile_foreground_image_inset">8dp</dimen>
+    <dimen name="preference_icon_foreground_image_inset">12dp</dimen>
+
+    <!-- Meminfo in overview -->
+    <dimen name="meminfo_claimed_height">16dp</dimen>
+
+    <!-- QuickSpace -->
+    <dimen name="quickspace_title_size">20sp</dimen>
+    <dimen name="quickspace_subtitle_size">16sp</dimen>
+    <dimen name="quickspace_alternate_title_size">18sp</dimen>
+    <dimen name="quickspace_alternate_subtitle_size">16sp</dimen>
+
+    <!-- Search bar margins -->
+    <dimen name="all_apps_search_bar_margin_side">38dp</dimen>
+    <dimen name="all_apps_search_bar_margin_top">28dp</dimen>
+    <dimen name="all_apps_search_bar_height">55dp</dimen>
+    <dimen name="compact_search_bar_width">125dp</dimen>
+    <dimen name="compact_search_bar_height">36dp</dimen>
+    <dimen name="compact_search_bar_icon_size">20dp</dimen>
+    <dimen name="compact_search_bar_icon_end_gap">10dp</dimen>
+    <dimen name="compact_search_bar_icon_text_gap">4dp</dimen>
+    <dimen name="compact_search_bar_text_end_gap">20dp</dimen>
+    <dimen name="compact_search_bar_text_size">16sp</dimen>
+    
+    <!-- Wallpaper carousel -->
+    <dimen name="wallpaper_carousel_height">120dp</dimen>
+
+    <!-- Burn-in protection shift amounts -->
+    <dimen name="burn_in_protection_horizontal_shift">12dp</dimen>
+    <dimen name="burn_in_protection_vertical_shift">6dp</dimen>
+
+    <!-- App drawer searchbar -->
+    <dimen name="all_apps_search_bar_bottom_padding_extra">32dp</dimen>
+    <dimen name="all_apps_page_indicator_bottom_margin">32dp</dimen>
+
+    <dimen name="icon_picker_cell_size">56dp</dimen>
+     <dimen name="icon_picker_cell_padding">8dp</dimen>
+</resources>

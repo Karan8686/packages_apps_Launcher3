@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) 2016-2025 crDroid Android Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+<androidx.preference.PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:launcher="http://schemas.android.com/apk/res-auto"
+    xmlns:settings="http://schemas.android.com/apk/res/com.android.launcher3">
+
+    <PreferenceCategory
+        android:title="@string/drawer_list_title">
+
+        <com.android.launcher3.settings.CaddyCardSelectorPreference
+            android:key="pref_drawer_list"
+            android:summary="@string/drawer_list_summary"
+            android:defaultValue="true"
+            android:persistent="true"
+            launcher:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <ListPreference
+        android:key="pref_app_drawer_style"
+        android:title="@string/drawer_style_title"
+        android:summary="%s"
+        android:entries="@array/app_drawer_style_entries"
+        android:entryValues="@array/app_drawer_style_values"
+        android:defaultValue="normal"
+        android:persistent="true"
+        launcher:iconSpaceReserved="false" />
+
+    <ListPreference
+        android:key="pref_app_drawer_sorting_mode"
+        android:title="@string/app_drawer_sort_mode_title"
+        android:summary="%s"
+        android:entries="@array/app_drawer_sort_mode_entries"
+        android:entryValues="@array/app_drawer_sort_mode_values"
+        android:defaultValue="alphabetical"
+        android:persistent="true"
+        launcher:iconSpaceReserved="false" />
+
+    <com.android.launcher3.settings.preferences.CustomSeekBarPreference
+        android:key="pref_app_drawer_opacity"
+        android:title="@string/background_opacity_title"
+        android:persistent="true"
+        android:max="100"
+        android:min="0"
+        settings:units="%"
+        android:defaultValue="60" />
+
+    <SwitchPreferenceCompat
+        android:key="pref_app_drawer_custom_color_enabled"
+        android:title="@string/pref_app_drawer_custom_color_title"
+        android:summary="@string/pref_app_drawer_custom_color_summary"
+        android:defaultValue="false"
+        android:persistent="true"
+        launcher:iconSpaceReserved="false" />
+
+    <com.android.launcher3.settings.preferences.ColorPreference
+        android:key="pref_app_drawer_custom_color_light"
+        android:title="@string/pref_app_drawer_custom_color_light_title"
+        android:defaultValue="-1"
+        android:dependency="pref_app_drawer_custom_color_enabled"
+        android:persistent="true"
+        launcher:iconSpaceReserved="false" />
+
+    <com.android.launcher3.settings.preferences.ColorPreference
+        android:key="pref_app_drawer_custom_color_dark"
+        android:title="@string/pref_app_drawer_custom_color_dark_title"
+        android:defaultValue="-16777216"
+        android:dependency="pref_app_drawer_custom_color_enabled"
+        android:persistent="true"
+        launcher:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        android:key="pref_allapps_icon_customization"
+        android:title="@string/pref_icon_customization_title"
+        android:summary="@string/pref_icon_customization_summary"
+        android:defaultValue="true"
+        android:persistent="true"
+        launcher:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        android:key="pref_drawer_open_keyboard"
+        android:title="@string/drawer_open_keyboard_title"
+        android:summary="@string/drawer_open_keyboard_summary"
+        android:defaultValue="false"
+        android:persistent="true"
+        launcher:iconSpaceReserved="false" />
+
+    <ListPreference
+        android:key="pref_allapps_search_placement"
+        android:title="@string/drawer_search_title"
+        android:summary="%s"
+        android:entries="@array/allapps_search_placement_entries"
+        android:entryValues="@array/allapps_search_placement_values"
+        android:defaultValue="top"
+        android:persistent="true"
+        launcher:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        android:key="pref_pinned_apps_enabled"
+        android:title="@string/pref_pinned_apps_enabled_title"
+        android:summary="@string/pref_pinned_apps_enabled_summary"
+        android:defaultValue="false"
+        android:persistent="true"
+        launcher:iconSpaceReserved="false" />
+
+    <Preference
+        android:key="pref_pinned_apps_list"
+        android:title="@string/pref_pinned_apps_list_title"
+        android:summary="@string/pref_pinned_apps_list_summary"
+        android:dependency="pref_pinned_apps_enabled"
+        launcher:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        android:key="pref_drawer_scrollbar"
+        android:title="@string/drawer_scrollbar_title"
+        android:summary="@string/drawer_scrollbar_summary"
+        android:defaultValue="true"
+        launcher:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        android:key="pref_drawer_show_labels"
+        android:title="@string/drawer_show_labels"
+        android:defaultValue="true"
+        android:persistent="true"
+        launcher:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        android:key="pref_enable_two_line_toggle"
+        android:title="@string/icon_two_lines_title"
+        android:defaultValue="false"
+        android:persistent="true"
+        launcher:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        android:key="pref_all_apps_dark_text"
+        android:title="@string/all_apps_dark_text_title"
+        android:summary="@string/all_apps_dark_text_summary"
+        android:defaultValue="false"
+        android:persistent="true"
+        android:dependency="pref_drawer_show_labels"
+        launcher:iconSpaceReserved="false" />
+
+    <com.android.launcher3.settings.preferences.CustomSeekBarPreference
+        android:key="pref_row_height"
+        android:title="@string/row_height_title"
+        android:persistent="true"
+        android:max="150"
+        settings:min="75"
+        settings:units="%"
+        android:defaultValue="100" />
+
+</androidx.preference.PreferenceScreen>

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) 2016-2025 crDroid Android Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+<resources>
+
+    <string-array name="quickspace_weather_provider_entries">
+        <item>@string/quickspace_weather_provider_entry_auto</item>
+        <item>@string/quickspace_weather_provider_entry_seraphix</item>
+        <item>@string/quickspace_weather_provider_entry_omnijaws</item>
+    </string-array>
+
+    <string-array name="quickspace_weather_provider_values">
+        <item>auto</item>
+        <item>seraphix</item>
+        <item>omnijaws</item>
+    </string-array>
+
+    <!-- Hotseat searchbar -->
+    <string-array name="compact_search_bar_action_entries">
+        <item>@string/compact_search_bar_action_google</item>
+        <item>@string/compact_search_bar_action_lens</item>
+        <item>@string/compact_search_bar_action_mic</item>
+        <item>@string/compact_search_bar_action_gemini</item>
+    </string-array>
+
+    <string-array name="compact_search_bar_action_values" translatable="false">
+        <item>google_search</item>
+        <item>lens</item>
+        <item>mic</item>
+        <item>gemini</item>
+    </string-array>
+
+    <!-- App drawer searchbar -->
+    <string-array name="allapps_search_placement_entries">
+        <item>@string/drawer_search_location_hidden</item>
+        <item>@string/drawer_search_location_top</item>
+        <item>@string/drawer_search_location_bottom</item>
+    </string-array>
+
+    <string-array name="allapps_search_placement_values" translatable="false">
+        <item>hidden</item>
+        <item>top</item>
+        <item>bottom</item>
+    </string-array>
+
+    <!-- App drawer styles -->
+    <string-array name="app_drawer_style_entries">
+        <item>@string/drawer_style_normal</item>
+        <item>@string/drawer_style_legacy</item>
+        <item>@string/drawer_style_list</item>
+        <item>@string/drawer_style_oneui</item>
+        <item>@string/drawer_style_ios</item>
+    </string-array>
+
+    <string-array name="app_drawer_style_values" translatable="false">
+        <item>normal</item>
+        <item>fullscreen</item>
+        <item>horizontal_list</item>
+        <item>vertical</item>
+        <item>ios</item>
+    </string-array>
+
+    <!-- App drawer sorting -->
+    <string-array name="app_drawer_sort_mode_entries">
+        <item>@string/app_drawer_sort_alphabetical</item>
+        <item>@string/app_drawer_sort_install_date</item>
+        <item>@string/app_drawer_sort_usage</item>
+    </string-array>
+
+    <string-array name="app_drawer_sort_mode_values" translatable="false">
+        <item>alphabetical</item>
+        <item>install_date</item>
+        <item>usage</item>
+    </string-array>
+
+    <string-array name="recents_styles_entries">
+        <item>@string/recents_style_default</item>
+        <item>@string/recents_style_stock</item>
+        <item>@string/recents_style_staple</item>
+        <item>@string/recents_style_ios</item>
+        <item>@string/recents_style_oxygen</item>
+    </string-array>
+
+    <string-array name="recents_styles_values" translatable="false">
+        <item>default</item>
+        <item>stock</item>
+        <item>staple</item>
+        <item>ios</item>
+        <item>oxygen</item>
+    </string-array>
+    <string-array name="overview_gesture_action_entries">
+        <item>@string/overview_gesture_action_freeform</item>
+        <item>@string/overview_gesture_action_split_screen</item>
+    </string-array>
+
+    <string-array name="overview_gesture_action_values" translatable="false">
+        <item>freeform</item>
+        <item>split_screen</item>
+    </string-array>
+
+    <string-array name="themed_icon_color_preset_entries">
+        <item>@string/themed_icon_color_preset_axicons</item>
+        <item>@string/themed_icon_color_preset_aosp</item>
+        <item>@string/themed_icon_color_preset_custom</item>
+    </string-array>
+
+    <string-array name="themed_icon_color_preset_values">
+        <item>axicons</item>
+        <item>aosp</item>
+        <item>custom</item>
+    </string-array>
+</resources>

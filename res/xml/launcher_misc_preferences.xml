@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) 2016-2025 crDroid Android Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+<androidx.preference.PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:launcher="http://schemas.android.com/apk/res-auto"
+    xmlns:settings="http://schemas.android.com/apk/res/com.android.launcher3">
+
+    <SwitchPreferenceCompat
+        android:key="pref_allowRotation"
+        android:title="@string/allow_rotation_title"
+        android:summary="@string/allow_rotation_desc"
+        android:defaultValue="@bool/config_allowRotation"
+        android:persistent="true"
+        launcher:logIdOn="615"
+        launcher:logIdOff="616"
+        launcher:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
+        android:key="pref_navbar_burn_in_protection"
+        android:title="@string/navbar_burn_in_protection_title"
+        android:summary="@string/navbar_burn_in_protection_summary"
+        android:defaultValue="true"
+        android:persistent="true"
+        launcher:iconSpaceReserved="false" />
+
+    <com.android.launcher3.settings.preferences.CustomSeekBarPreference
+        android:key="pref_navbar_burn_in_interval"
+        android:title="@string/navbar_burn_in_interval_title"
+        android:persistent="true"
+        android:max="300"
+        android:defaultValue="60"
+        android:dependency="pref_navbar_burn_in_protection"
+        settings:min="15"
+        settings:units="s"
+        launcher:iconSpaceReserved="false" />
+
+    <Preference
+        android:key="pref_trust_apps"
+        android:title="@string/trust_apps_manager_name" />
+
+    <Preference
+        android:key="pref_overscroll_settings"
+        android:title="@string/overscroll_settings_title"
+        android:summary="@string/overscroll_settings_summary"
+        launcher:iconSpaceReserved="false" />
+
+    <androidx.preference.PreferenceScreen
+        android:persistent="false"
+        android:title="@string/suggestion_pref_screen_title"
+        android:key="pref_suggestions"
+        android:summary="@string/suggestion_pref_screen_desc">
+        <intent android:action="android.settings.ACTION_CONTENT_SUGGESTIONS_SETTINGS" />
+    </androidx.preference.PreferenceScreen>
+
+     <com.android.launcher3.settings.preferences.CustomSeekBarPreference
+        android:key="pref_blur_depth"
+        android:title="@string/background_blur_title"
+        android:summary="@string/background_blur_summary"
+        android:persistent="true"
+        android:max="175"
+        settings:min="0"
+        settings:units="px"
+        android:defaultValue="30" />
+
+    <com.android.launcher3.settings.preference.RestartPreference
+        android:key="pref_restart"
+        android:title="@string/pref_restart_title"
+        android:summary="@string/pref_restart_summary" />
+
+</androidx.preference.PreferenceScreen>

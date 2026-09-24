@@ -1,0 +1,661 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+     Copyright (C) 2016-2025 crDroid Android Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+
+    <!-- Application name -->
+    <string name="crdroid_app_name" translatable="false">Lunaris Launcher</string>
+
+    <!-- Folder titles -->
+    <string name="google_folder_title" translatable="false">Google</string>
+
+    <!-- General -->
+    <string name="settings_title">Home settings</string>
+
+    <!-- Categories -->
+    <string name="home_category_title">Home screen</string>
+    <string name="home_category_summary">Set Google now panel and more</string>
+    <string name="icons_category_title">Icons</string>
+    <string name="icons_category_summary">Set icon size and more</string>
+    <string name="app_drawer_category_title">App drawer</string>
+    <string name="app_drawer_category_summary">Customize your app drawer</string>
+    <string name="recents_category_title">Recents</string>
+    <string name="recents_category_summary">Revamp the overview screen</string>
+    <string name="misc_category_title">Miscellaneous</string>
+    <string name="misc_category_summary">Other options</string>
+    <string name="general_category_title">General</string>
+    <string name="interface_category_title">Interface</string>
+    <string name="quickspace_category_title">Quickspace</string>
+    <string name="search_bar_category_title">Search bar</string>
+    <string name="actions_category_title">Quick actions</string>
+
+    <!-- Developer options -->
+    <string name="dev_options_title">Developer options</string>
+    <string name="dev_options_summary">Enable some hidden features at your own risk</string>
+
+    <!-- Edit workspace -->
+    <string name="settings_lock_layout_title">Lock layout</string>
+    <string name="settings_lock_layout_summary_on">Icons and widgets can\'t be added, removed and moved on the homescreen</string>
+    <string name="settings_lock_layout_summary_off">Icons and widgets can be added, removed and moved on the homescreen</string>
+    <string name="settings_edit_widgets_error">It\'s not possible to add widgets to the home screen</string>
+
+    <!-- Hide labels -->
+    <string name="desktop_show_labels">Icon labels on desktop</string>
+    <string name="drawer_show_labels">Icon labels in drawer</string>
+
+    <!-- Settings title to show Google Now at -1 screen on launcher. [CHAR LIMIT=50] -->
+    <string name="title_show_google_app">Swipe to access Google app</string>
+    <string name="pref_show_google_now_summary" translatable="false">@string/msg_minus_one_on_left</string>
+    <!-- Settings message explaining when the -1 screen is available on an LTR device. [CHAR LIMIT=100] -->
+    <string name="msg_minus_one_on_left">When you swipe right from main home screen</string>
+    <!-- Settings message explaining when the -1 screen is available on an RTL device. [CHAR LIMIT=100] -->
+    <string name="msg_minus_one_on_right">When you swipe left from main home screen</string>
+
+    <!-- All apps icon customizations -->
+    <string name="pref_icon_customization_title">Use icon customizations in drawer</string>
+    <string name="pref_icon_customization_summary">Follow icon customizations used on home screen</string>
+
+    <!-- Pause apps shortcut -->
+    <string name="pause">Pause</string>
+    <string name="pause_apps_dialog_title">Pause %1$s?</string>
+    <string name="pause_apps_dialog_message">Notifications for %1$s will be paused</string>
+    <string name="paused_apps_dialog_title">App paused</string>
+    <string name="paused_apps_dialog_message">%1$s was directly paused from the launcher</string>
+    <string name="paused_apps_drop_target_label">Pause app</string>
+    <string name="work_apps_paused_title_custom">Work apps are off</string>
+    <string name="work_apps_pause_btn_text_custom">Turn off work apps</string>
+    <string name="work_apps_enable_btn_text_custom">Turn on work apps</string>
+    <string name="work_apps_paused_info_body_custom">Your work apps cannot send you notifications, use your battery, or access your location</string>
+    <string name="work_apps_paused_telephony_unavailable_body_custom">Your work apps cannot receive phone calls or text messages, send you notifications, use your battery, or access your location</string>
+
+    <!-- Suggestions -->
+    <string name="suggestion_pref_screen_title">Suggestions</string>
+    <string name="suggestion_pref_screen_desc">For All Apps &amp; Home screen suggestions</string>
+
+    <!-- Restart launcher -->
+    <string name="pref_restart_title">Restart</string>
+    <string name="pref_restart_summary">Restart the launcher manually to apply any pending settings</string>
+    <string name="restarting_launcher">Restarting launcher...</string>
+    <string name="restarting_launcher_changes">Restarting launcher to apply changes...</string>
+    <string name="updating_launcher_components">Restarting launcher to update launcher components...</string>
+
+    <!-- DT2S -->
+    <string name="pref_sleep_gesture_title">Double tap to sleep</string>
+    <string name="pref_sleep_gesture_summary">Double tap empty space on home screen to turn off the screen</string>
+    <string name="pref_sleep_gesture_haptic_title">Vibrate on double tap to sleep</string>
+    <string name="pref_sleep_gesture_haptic_summary">Provide haptic feedback on double tap to sleep gesture</string>
+
+    <!-- Open keyboard -->
+    <string name="drawer_open_keyboard_title">Swipe to start search</string>
+    <string name="drawer_open_keyboard_summary">Open keyboard whenever app drawer becomes visible</string>
+
+    <!-- Icon size -->
+    <string name="icon_size_title">Icon size</string>
+
+    <!-- Font size -->
+    <string name="font_size_title">Font size</string>
+
+    <!-- Notification badges -->
+    <string name="notification_badge_count_title">Notification count</string>
+    <string name="notification_badge_count_desc">Show unread counts on notification dots</string>
+
+    <!-- App label -->
+    <string name="icon_two_lines_title">Use two lines for app label</string>
+
+    <!-- Row Height -->
+    <string name="row_height_title">Row height</string>
+
+    <!-- Hotseat Background -->
+    <string name="hotseat_bg_title">Hotseat background</string>
+    <string name="hotseat_bg_summary">Add translucent background to the app dock</string>
+
+    <!-- Background opacity -->
+    <string name="background_opacity_title">Background opacity</string>
+
+    <!-- Stroke -->
+    <string name="stroke_width_title">Stroke</string>
+
+    <!-- Kill App recents action shortcut -->
+    <string name="recent_task_option_kill_app">Kill</string>
+    <string name="recents_app_killed">App killed</string>
+
+    <!-- Hotseat searchbar -->
+    <string name="label_search">Search</string>
+    <string name="label_lens">Google Lens</string>
+    <string name="label_voice_search">Voice search</string>
+    <string name="label_ai_mode">AI Mode</string>
+    <string name="ai_mode_not_available">AI functionality not available</string>
+    <string name="label_gemini_search">AI mode</string>
+    <string name="dock_music_search_title">Music search</string>
+    <string name="dock_music_search_summary">Start music search on pressing mic icon</string>
+    <string name="dock_search_title">Google search bar</string>
+    <string name="dock_search_summary">Search bar in the bottom dock</string>
+    <string name="dock_search_widget_default">Default Google search bar</string>
+    <string name="dock_search_widget_picker_title">Select dock search widget</string>
+    <string name="dock_search_widget_title">Dock search widget</string>
+    <string name="dock_search_widget_summary">Replace the dock search bar with a compatible search widget</string>
+    <string name="compact_search_bar_title">Compact search bar</string>
+    <string name="compact_search_bar_summary">Show a compact search pill above the app dock</string>
+    <string name="compact_search_bar_action_title">Compact search action</string>
+    <string name="compact_search_bar_action_google">Google search</string>
+    <string name="compact_search_bar_action_lens">Google Lens</string>
+    <string name="compact_search_bar_action_mic">Voice search</string>
+    <string name="compact_search_bar_action_gemini">Gemini</string>
+    <string name="dock_theme_title">Themed icons</string>
+    <string name="dock_theme_summary">Use themed icons for search bar</string>
+    <string name="search_radius_title">Corner radius</string>
+
+    <!-- App drawer searchbar -->
+    <string name="drawer_search_title">App search bar location</string>
+    <string name="drawer_search_location_hidden">Hidden</string>
+    <string name="drawer_search_location_top">Top</string>
+    <string name="drawer_search_location_bottom">Bottom</string>
+
+    <!-- Pinned Apps -->
+    <string name="pref_pinned_apps_enabled_title">Enable pinned apps</string>
+    <string name="pref_pinned_apps_enabled_summary">Show a row of pinned apps below the search bar</string>
+    <string name="pref_pinned_apps_list_title">Pinned apps list</string>
+    <string name="pref_pinned_apps_list_summary">Select apps to pin</string>
+
+    <!-- Wallpaper scrolling -->
+    <string name="allow_wallpaper_scrolling">Wallpaper scrolling</string>
+    <string name="allow_wallpaper_scrolling_summary">Wallpaper scrolling effect for multiple screens</string>
+
+    <!-- Wallpaper zooming -->
+    <string name="allow_wallpaper_zooming">Wallpaper zooming</string>
+    <string name="allow_wallpaper_zooming_summary">Zoom in or out the wallpaper when using drawer or recent apps</string>
+
+    <!-- Homescreen Statusbar -->
+    <string name="show_statusbar_title">Status Bar</string>
+
+    <!-- Top shadow -->
+    <string name="show_top_shadow">Top shadow</string>
+
+    <!-- Memory info -->
+    <string name="meminfo_text">%1$s available | %2$s</string>
+    <string name="recents_meminfo_title">Memory info</string>
+    <string name="recents_meminfo_zram_title">ZRAM info</string>
+
+    <!-- Recents icons -->
+    <string name="recents_screenshot_title">Screenshot</string>
+    <string name="recents_clear_all_title">Clear all</string>
+    <string name="recents_lens_title">Share</string>
+    <string name="recents_task_corner_radius_title">Task corner radius</string>
+    <string name="recents_task_corner_radius_default">Default</string>
+
+    <!-- Overview gesture -->
+    <string name="overview_gesture_title">Recent apps swipe action</string>
+    <string name="overview_gesture_summary">Swipe up on an app in Recents to trigger the selected action</string>
+    <string name="overview_gesture_action_title">Swipe up action</string>
+    <string name="overview_gesture_action_freeform">Open in floating window</string>
+    <string name="overview_gesture_action_split_screen">Start split screen</string>
+    <string name="overview_gesture_threshold_title">Swipe distance</string>
+    <string name="overview_gesture_threshold_summary">Lower values trigger sooner, higher values require a longer swipe</string>
+    <string name="freeform_gesture_threshold_reached">Release to launch floating window</string>
+
+    <!-- Parallax -->
+    <string name="short_parallax_title">Allow short parallax</string>
+    <string name="short_parallax_summary">Enable full wallpaper scroll effect on smaller numbers of pages instead of cropping the wallpaper</string>
+    <string name="single_page_center_title">Single page center</string>
+    <string name="single_page_center_summary">Center wallpaper if only using a single page</string>
+
+    <!-- App drawer scrollbar -->
+    <string name="drawer_scrollbar_title">Scrollbar</string>
+    <string name="drawer_scrollbar_summary">Scrollbar on side of the app drawer</string>
+
+    <!-- Dark Status Bar -->
+    <string name="perf_dark_status_bar_title">Dark status bar</string>
+    <string name="perf_dark_status_bar_summary">Always use dark status bar on home screen</string>
+
+    <!-- QuickSpace -->
+    <string name="show_quickspace_title">At A Glance</string>
+    <string name="show_quickspace_summary">Show at the top of your home screen</string>
+    <string name="quickspace_date_format" translatable="false">EEE, MMM d</string>
+    <string name="quickspace_date_format_minimalistic" translatable="false">EEEE, MMMM d</string>
+
+    <!-- QuickSpace: QuickEvent: Greetings -->
+    <string name="quickspace_grt_morning">Good morning.</string>
+    <string name="quickspace_grt_evening">Good evening.</string>
+    <string name="quickspace_grt_afternoon">Good afternoon.</string>
+    <string name="quickspace_grt_night">Good night.</string>
+    <string name="quickspace_grt_general">Good day.</string>
+    <string name="quickspace_ext_one">Today is</string>
+    <string name="quickspace_ext_two">It\'s</string>
+
+    <!-- QuickSpace: QuickEvent: Ambient Play -->
+    <string name="qe_now_playing_unknown_artist">Unknown Artist</string>
+    <string name="qe_now_playing_ext_one">Now playing</string>
+    <string name="qe_now_playing_by">By</string>
+
+    <!-- Quickspace Now Playing -->
+    <string name="quickspace_now_playing_title">Now playing</string>
+    <string name="quickspace_now_playing_summary">Show the song you\'re playing</string>
+
+    <!-- Quickspace alternative view -->
+    <string name="quickspace_alternate_style_title">Extended style</string>
+    <string name="quickspace_alternate_style_summary">Switch to extended style</string>
+
+    <!-- Quickspace new style -->
+    <string name="quickspace_style_title">At A Glance style</string>
+    <string-array name="quickspace_style_entries">
+        <item>Default</item>
+        <item>Extended</item>
+        <item>OOS Clock</item>
+    </string-array>
+    <string-array name="quickspace_style_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+
+    <!-- Quickspace OOS clock color -->
+    <string name="quickspace_clock_custom_color_title">Custom clock color</string>
+    <string name="quickspace_clock_custom_color_summary">Use your own color for the hour digits</string>
+    <string name="quickspace_clock_color_title">Clock color</string>
+
+    <!-- Quickspace PSA - Custom messages for the glance -->
+    <string name="quickspace_psa_title">Random messages</string>
+    <string name="quickspace_psa_summary">Make your companion more lively with random messages</string>
+
+     <string-array name="quickspace_psa_morning">
+        <item>Good morning!</item>
+        <item>Good morning, let\’s make it a productive one.</item>
+        <item>We are so back. Good morning, bestie.</item>
+        <item>Fresh day, fresh fit, fresh mindset.</item>
+        <item>Wishing you a smooth and successful day.</item>
+        <item>Low-key, a 5-minute nap would hit.</item>
+        <item>Time to secure the bag.</item>
+        <item>Morning is your clean slate, make it count.</item>
+        <item>New day just dropped, lowkey excited ngl.</item>
+        <item>Early light, big potential.</item>
+        <item>Your day just launched. Let’s run it well.</item>
+        <item>New sunrise, new chances.</item>
+        <item>Wake up and lock in.</item>
+        <item>The world is awake, and so is your potential.</item>
+        <item>Day one of your next win starts now.</item>
+        <item>Let your morning routine do the heavy lifting.</item>
+        <item>Sun’s up, momentum’s up.</item>
+        <item>It\'s giving fresh start, and I\'m here for it.</item>
+        <item>The algorithm of life just served you a new day.</item>
+        <item>Bestie, the whole day is yours rn.</item>
+        <item>Rise, shine, and stay on brand.</item>
+        <item>The best time to start is still right now.</item>
+    </string-array>
+    <string-array name="quickspace_psa_noon">
+        <item>Keep the pace, not the pressure.</item>
+        <item>Every minute has potential.</item>
+        <item>Not me still grinding at noon. Based.</item>
+        <item>The grind? Undefeated. You? Also undefeated.</item>
+        <item>Midday vibe check: still slaying fr.</item>
+        <item>Your progress is lowkey sending me.</item>
+        <item>Plot twist: you\'re winning and it shows.</item>
+        <item>You\'re literally that person rn.</item>
+        <item>Turn “what if” into “done.”</item>
+        <item>Bffr, you\'re literally that person rn.</item>
+        <item>Stay in your bag, bestie.</item>
+        <item>You ate this morning, don\'t let the afternoon be mid.</item>
+        <item>Your potential right now? Absolutely bussin.</item>
+        <item>Build a day you actually like.</item>
+        <item>Dream big, move smart, repeat.</item>
+        <item>You are stronger than the afternoon slump.</item>
+        <item>Setbacks are just setup in disguise.</item>
+        <item>Stay in the process, not just the outcome.</item>
+        <item>Chase the goal, not the noise.</item>
+        <item>Your potential is still very much online.</item>
+    </string-array>
+    <string-array name="quickspace_psa_early_evening">
+        <item>Stay present, the plot is still moving.</item>
+        <item>In every dusk, find a new dawn of opportunity.</item>
+        <item>Enjoy the ride, not just the result.</item>
+        <item>Your mindset is doing the styling.</item>
+        <item>The story keeps going after sunset.</item>
+        <item>Stay curious, stay based, stay grateful.</item>
+        <item>Time to reflect, reset, and re-enter.</item>
+        <item>Choose calm, even when the day is loud.</item>
+        <item>Evenings still clock in for progress.</item>
+        <item>Be the reason the vibe stays good.</item>
+        <item>Your potential does not log off.</item>
+        <item>Small moments can still feel magical.</item>
+        <item>Your life is what you make of it; make it extraordinary.</item>
+        <item>Stay curious. Stay grateful. Stay polished.</item>
+        <item>Be the change you wish to see in the world.</item>
+        <item>You are more capable than you think.</item>
+        <item>The only real limit is the one you accept.</item>
+        <item>Progress still counts after work hours.</item>
+    </string-array>
+    <string-array name="quickspace_psa_evening">
+        <item>Seize the night, for it holds its own mysteries.</item>
+        <item>In the quiet of the this evening, find serenity.</item>
+        <item>Stars are bussin tonight ngl.</item>
+        <item>Your journey continues even after the sun has set.</item>
+        <item>Let the night be your canvas; paint it with dreams.</item>
+        <item>In the stillness, clarity shows up.</item>
+        <item>Not even the dark can dim your rizz.</item>
+        <item>Dream big, even in the late hours of the day.</item>
+        <item>Your life is a story waiting to be written.</item>
+        <item>Time to reflect, reset, and recharge.</item>
+        <item>Late night thoughts can lead to early morning revelations.</item>
+        <item>Find joy in the stillness of this evening.</item>
+        <item>The night sky is a vast canvas of dreams.</item>
+        <item>Your potential knows no bedtime; pursue your passions.</item>
+        <item>Stay hopeful, even in the darkest hours.</item>
+        <item>In the midst of chaos, find your inner calm.</item>
+        <item>Stay positive, stay locked in, make it happen.</item>
+    </string-array>
+    <string-array name="quickspace_psa_midnight">
+        <item>Nights are the quiet whispers of opportunity.</item>
+        <item>In the stillness of the night, find your inner strength.</item>
+        <item>Embrace the darkness, for it holds the keys to your dreams.</item>
+        <item>The world sleeps, but your potential is wide awake.</item>
+        <item>The night may be late, but your ambitions are timeless.</item>
+        <item>Stay curious, stay awake, and let nights guide you.</item>
+        <item>Find the courage to chase your dreams.</item>
+        <item>Great things never come from comfort zones.</item>
+        <item>You have the power to create your own destiny.</item>
+        <item>Happiness is a choice; choose it every day.</item>
+        <item>Life is what you make it, so make it count.</item>
+        <item>Stay focused, stay steady, stay unstoppable.</item>
+        <item>You are the author of your own story.</item>
+        <item>Progress over perfection, always.</item>
+        <item>Every day is a new beginning; make it a great one.</item>
+        <item>Inspire others by being your authentic self.</item>
+        <item>Your attitude determines your direction.</item>
+    </string-array>
+    <string-array name="quickspace_psa_random">
+        <item>Ignorance is Bliss</item>
+        <item>Blissfully unbothered.</item>
+        <item>Already flashing another update? You\'re so real for that.</item>
+        <item>Keep it peaceful, keep it practical.</item>
+        <item>Oh hey, what\'s good?</item>
+        <item>Welcome to real Matrix!</item>
+        <item>The number of screenshots you take is sending me.</item>
+        <item>Open goodness with Lunaris</item>
+        <item>Spread love, not havoc</item>
+        <item>We didn\'t start the fire!</item>
+        <item>Time for some good music</item>
+        <item>\u003C\u003C\u003C\u003C\u003C\u003C\u003C HEAD</item>
+        <item>You need Lunaris Premium to see this</item>
+        <item>Remember the Lineage of the Unicorn</item>
+        <item>Enjoy Xtended battery life</item>
+        <item>Starting from the ground zero</item>
+        <item>We love you 3000</item>
+        <item>Delicious even without Sushi</item>
+        <item>Do something kind today</item>
+        <item>This is best Pixel Experience, isn\'t it?</item>
+        <item>No illusions, welcome to reality!</item>
+        <item>Thank you for your support</item>
+        <item>No festival for Derps - only perfection!</item>
+        <item>She YAAP om my kernel till I panic</item>
+        <item>One of the buildbot\'s best picks</item>
+        <item>Sanity for your Paranoia</item>
+        <item>Rising in peace</item>
+        <item>What a lovely experience, isn\'t it?</item>
+        <item>Evolution is a myth, apparently.</item>
+        <item>You are what you flash, don\'t be Potato</item>
+        <item>What\'s on your mind?</item>
+        <item>Expecto Patronum</item>
+        <item>Wubba Lubba Dub Dub (valid response to existence)</item>
+        <item>Winner Winner ....?</item>
+        <item>rm -rf \/</item>
+        <item>Pringles aren\'t actually potato chips..</item>
+        <item>Remember to check device\'s battery level!</item>
+        <item>Check your email/messages.</item>
+        <item>Check your to-do list if you have one.</item>
+        <item>You can disable quickspace, but why would you</item>
+        <item>Loving us? Send us a beer</item>
+        <item>Best Rom Ever.</item>
+        <item>Say hi to us on Telegram</item>
+        <item>We love you 3000</item>
+        <item>Not the buildbot cooking this hard</item>
+    </string-array>
+    <string name="intent_no_app_clock_found">Unable to find calendar or clock activity</string>
+
+    <!-- QuickSpace: QuickEvent: Weather -->
+    <string name="quickspace_weather_provider_title">Weather provider</string>
+    <string name="quickspace_weather_provider_entry_auto">Auto</string>
+    <string name="quickspace_weather_provider_entry_seraphix">Google Smartspace</string>
+    <string name="quickspace_weather_provider_entry_omnijaws">OmniJaws</string>
+    <string name="quick_event_ambient_weather_title">Weather update</string>
+    <string name="quick_event_ambient_weather_summary">Display current weather update</string>
+    <string name="quick_event_ambient_weather_enabled_info">Requires weather service to be enabled</string>
+    <string name="quick_event_weather_clouds">Cloudy</string>
+    <string name="quick_event_weather_rain">Rainy</string>
+    <string name="quick_event_weather_clear">Clear Sky</string>
+    <string name="quick_event_weather_storm">Stormy</string>
+    <string name="quick_event_weather_snow">Snowy</string>
+    <string name="quick_event_weather_wind">Windy</string>
+    <string name="quick_event_weather_mist">Misty</string>
+    <string name="quick_event_weather_city_title">Current location</string>
+    <string name="quick_event_weather_city_summary">Display current weather location</string>
+    <string name="quick_event_weather_text_title">Current condition</string>
+    <string name="quick_event_weather_text_summary">Display current weather condition summary</string>
+
+    <!-- Auto-hide page indicator dots -->
+    <string name="auto_hide_dots">Auto-hide page indicator</string>
+    <string name="auto_hide_dots_summary">Hide the page indicator dots automatically</string>
+
+    <!-- Background blur -->
+    <string name="background_blur_title">Background blur depth</string>
+    <string name="background_blur_summary">Set blur depth level for recents and app drawer</string>
+    
+    <!-- Custom seekbar -->
+    <string name="custom_seekbar_value">Value: <xliff:g id="v">%s</xliff:g></string>
+    <string name="custom_seekbar_default_value">by default</string>
+    <string name="custom_seekbar_default_value_to_set">Default value: <xliff:g id="v">%s</xliff:g>\nLong tap to set</string>
+    <string name="custom_seekbar_default_value_is_set">Default value is set</string>
+
+    <!-- AppInfo -->
+    <string name="app_info_title">Application info</string>
+    <string name="app_info_version_value" translatable="false">%1$s (%2$d)</string>
+    <string name="app_info_source">Source</string>
+    <string name="app_info_source_system">System</string>
+    <string name="app_info_last_update">Last update</string>
+    <string name="app_info_version">Version</string>
+    <string name="app_info_more">More</string>
+
+    <!-- Icon pack -->
+    <string name="icon_pack_title">Icon pack</string>
+    <string name="icon_pack_default_label">Default</string>
+    <string name="icon_pack_add">Install more</string>
+    <string name="icon_pack_no_market">There\'s no available app store</string>
+
+    <!-- App drawer categories -->
+    <string name="others_category_label">Others</string>
+    <string name="system_apps_category_label">System Apps</string>
+    <string name="google_apps_category_label">Google Apps</string>
+    <string name="productivity_category_label">Productivity</string>
+    <string name="news_category_label">News</string>
+    <string name="social_category_label">Social</string>
+    <string name="audio_category_label">Audio</string>
+    <string name="video_category_label">Video</string>
+    <string name="image_category_label">Image</string>
+
+    <!-- Drawer list preference -->
+    <string name="drawer_list_title">Layout</string>
+    <string name="drawer_list_summary">Choose between default list view or categorized folders (Caddy)</string>
+    <string name="feed_default">Default</string>
+    <string name="caddy_beta">Caddy (Beta)</string>
+
+    <!-- Wallpaper carousel -->
+    <string name="wallpaper_carousel_title">Wallpaper carousel</string>
+    <string name="wallpaper_carousel_summary">Quickly switch wallpapers from the long-press menu</string>
+    <string name="wallpaper_carousel_lockscreen_title">Apply to lock screen</string>
+    <string name="wallpaper_carousel_lockscreen_summary">Set the same wallpaper on the lock screen</string>
+
+    <!-- Lock -->
+    <string name="action_lock">Lock app in recents</string>
+    <string name="action_unlock">Unlock app in recents</string>
+    <string name="unlock_app">App unlocked in recents</string>
+    <string name="lock_app">App locked in recents</string>
+    <string name="lock_app_prompt">Swipe down to lock</string>
+    <string name="unlock_app_prompt">Swipe down to unlock</string>
+    <string name="lock_app_release_to_confirm">Release to lock</string>
+    <string name="unlock_app_release_to_confirm">Release to unlock</string>
+    <string name="lock_task_in_recents">Lock</string>
+    <string name="unlock_task_from_recents">Unlock</string>
+    
+    <!-- Additional shape options in customization picker -->
+    <string name="pebble_shape_title">Pebble</string>
+    <string name="vessel_shape_title">Vessel</string>
+    <string name="pure_square_shape_title">Pure square</string>
+    <string name="squircle_shape_title">Squircle</string>
+    <string name="tapered_rect_shape_title">Tapered rect</string>
+    <string name="teardrop_shape_title">Teardrop</string>
+    <string name="rounded_rect_shape_title">Rounded rect</string>
+    <string name="cloudy_shape_title">Cloudy</string>
+    <string name="cylindrical_shape_title">Cylindrical</string>
+    <string name="flower_shape_title">Flower</string>
+    <string name="heart_shape_title">Heart</string>
+    <string name="hexagon_shape_title">Hexagon</string>
+    <string name="rounded_hexagon_shape_title">Rounded hexagon</string>
+    <string name="ios_style_shape_title">iOS Style</string>
+    <string name="leaf_shape_title">Leaf</string>
+    <string name="meow_shape_title">Meow</string>
+    <string name="samsung_style_shape_title">Samsung Style</string>
+    <string name="stretched_shape_title">Stretched</string>
+
+    <string name="recents_overview_style_title">New overview style</string>
+    <string name="recents_overview_style_summary">Use redesigned action buttons in recents</string>
+
+    <string name="hotseat_qsb_height_title">QSB height</string>
+    <string name="hotseat_qsb_height_summary">Use full QSB height instead of icon height</string>
+    
+    <!-- clear home screen -->
+    <string name="home_screen_actions">Home screen actions</string>
+    <string name="remove_all_views_from_home_screen">Clear home screen</string>
+    <string name="remove_all_views_from_home_screen_desc">Home screen will be cleared. Do you want to continue?</string>
+
+    <!-- Message shown when all home screen views are removed -->
+    <string name="home_screen_all_views_removed_msg">Home screen cleared</string>
+
+    <!-- QSB style -->
+    <string name="qsb_style_google_title">Google-style search bar</string>
+    <string name="qsb_style_google_summary">Use the QSB design with AI and Lens buttons</string>
+    
+    <!-- Dark app drawer text -->
+    <string name="all_apps_dark_text_title">Dark app labels</string>
+    <string name="all_apps_dark_text_summary">Always use dark text for app labels in the app drawer</string>
+
+    <!-- App drawer styles -->
+    <string name="drawer_style_title">App drawer style</string>
+    <string name="drawer_style_normal">Normal (bottom sheet)</string>
+    <string name="drawer_style_legacy">Legacy fullscreen</string>
+    <string name="drawer_style_list">List style</string>
+    <string name="drawer_style_oneui">OneUI style (paged)</string>
+    <string name="drawer_style_ios">iOS style (homescreen only)</string>
+    <string name="auto_add_shortcuts_forced_ios_summary">Enabled automatically while iOS style is active</string>
+
+    <!-- App drawer sorting -->
+    <string name="app_drawer_sort_mode_title">App drawer sorting</string>
+    <string name="app_drawer_sort_alphabetical">Sort alphabetically</string>
+    <string name="app_drawer_sort_install_date">Sort by install date</string>
+    <string name="app_drawer_sort_usage">Sort by usage</string>
+
+    <!-- App drawer color -->
+    <string name="pref_app_drawer_custom_color_title">Custom background color</string>
+    <string name="pref_app_drawer_custom_color_summary">Use a custom color for the app drawer background</string>
+    <string name="pref_app_drawer_custom_color_light_title">Light mode color</string>
+    <string name="pref_app_drawer_custom_color_dark_title">Dark mode color</string>
+
+    <!-- Color Picker -->
+    <string name="color_picker_hsb">HSB</string>
+    <string name="color_picker_rgb">RGB</string>
+    <string name="color_picker_hue">Hue</string>
+    <string name="color_picker_saturation">Saturation</string>
+    <string name="color_picker_brightness">Brightness</string>
+    <string name="color_picker_red">Red</string>
+    <string name="color_picker_green">Green</string>
+    <string name="color_picker_blue">Blue</string>
+    <string name="color_picker_hex">HEX</string>
+
+    <!-- Trust apps -->
+    <string name="trust_apps_manager_name">Hidden &amp; Protected apps</string>
+    <string name="trust_apps_auth_manager">Unlock to manage the hidden and protected apps</string>
+    <string name="trust_apps_auth_open_app">Authenticate to open %1$s</string>
+    <string name="trust_apps_loading">Loading\u2026</string>
+    <string name="trust_apps_no_lock_error">Please set up a secure lock screen to restrict app access</string>
+    <string name="trust_apps_help">Help</string>
+    <string name="trust_apps_info_hidden">Hidden apps and their widgets are hidden from the drawer</string>
+    <string name="trust_apps_info_protected">Protected apps require authentication to be opened from the launcher</string>
+
+    <!-- Recents style -->
+    <string name="recents_style_title">Recents layout style</string>
+    <string name="recents_style_default">Default</string>
+    <string name="recents_style_stock">Scale effect</string>
+    <string name="recents_style_staple">Kami style</string>
+    <string name="recents_style_ios">iOS style</string>
+    <string name="recents_style_oxygen">OxygenOS style</string>
+
+    <!-- Recents style -->
+    <string name="recents_scroll_vibrate_title">Scroll vibration</string>
+
+    <!-- Navbar -->
+    <string name="navbar_burn_in_protection_title">Navbar burn-in protection</string>
+    <string name="navbar_burn_in_protection_summary">Periodically shift the navigation handle to prevent display burn-in</string>
+    <string name="navbar_burn_in_interval_title">Shift interval</string>
+
+    <!-- Swipe down to lock -->
+    <string name="swipe_down_to_lock_title">Swipe down on task to toggle lock</string>
+    <string name="swipe_down_to_lock_summary">Swipe down on a recent task card to lock or unlock it from being cleared</string>
+
+    <!-- App launch blur -->
+    <string name="pref_app_launch_blur_title">App launch/close blur</string>
+    <string name="pref_app_launch_blur_summary">Show blur effect when launching or closing apps</string>
+
+    <!-- Rename app shortcut -->
+    <string name="rename_app_label">Rename</string>
+    <string name="rename_app_title">Enter app name</string>
+    <string name="rename_app_hide_name">Hide app name</string>
+    <string name="rename_app_updated">App name updated</string>
+    <string name="app_renamed_successfully">App renamed</string>
+    <string name="rename_app_empty_error">App name cannot be empty</string>
+    <string name="rename_app_length_error">App name must be %1$d characters or less</string>
+    <string name="rename_app_reset">Reset</string>
+    <string name="rename_app_reset_message">Name reset to original</string>
+
+    <string name="hotseat_bottom_space_default_title">Default hotseat spacing</string>
+    <string name="hotseat_bottom_space_default_summary">Use the default bottom spacing for the hotseat. Disable for a reduced spacing.</string>
+
+    <!-- Custom icon -->
+    <string name="app_info_custom_icon_title">Custom icon</string>
+    <string name="app_info_custom_icon_summary">Pick any icon from any icon pack</string>
+    <string name="icon_picker_search_hint">Search icons</string>
+    <string name="themed_icons_category_title">Themed icons style</string>
+    <string name="themed_icons_title">Enable themed icons customization</string>
+    <string name="themed_icons_summary">Allow customize themed icons</string>
+    <string name="themed_icon_scale_title">Icon scale</string>
+    <string name="themed_icon_color_preset_title">Color preset</string>
+    <string name="themed_icon_color_preset_axicons">Legacy</string>
+    <string name="themed_icon_color_preset_aosp">AOSP</string>
+    <string name="themed_icon_color_preset_custom">Custom</string>
+    <string name="themed_icon_background_color_title">Icon background color</string>
+    <string name="themed_icon_foreground_color_title">Icon foreground color</string>
+
+    <!-- Atmosphere Effects -->
+    <string name="atmosphere_effects_title">Atmosphere Effects</string>
+
+    <!-- Overscroll settings -->
+    <string name="overscroll_settings_title">Overscroll physics</string>
+    <string name="overscroll_settings_summary">Tune fling, damping, and stiffness for list overscroll</string>
+    <string name="overscroll_stiffness_title">Stiffness</string>
+    <string name="overscroll_stiffness_summary">Higher values make the overscroll spring snap back faster</string>
+    <string name="overscroll_damping_title">Damping</string>
+    <string name="overscroll_damping_summary">Higher values reduce bounce when the list settles back</string>
+    <string name="overscroll_max_stretch_title">Max stretch</string>
+    <string name="overscroll_max_stretch_summary">How far the list can be pulled past its edge, as a percentage of its size</string>
+    <string name="overscroll_velocity_scale_title">Fling velocity scale</string>
+    <string name="overscroll_velocity_scale_summary">How strongly a fling at the edge feeds into the overscroll spring</string>
+</resources>

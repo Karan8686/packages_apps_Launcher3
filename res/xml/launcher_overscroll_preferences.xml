@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Copyright (C) 2024-2026 Lunaris AOSP
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<androidx.preference.PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:launcher="http://schemas.android.com/apk/res-auto"
+    xmlns:settings="http://schemas.android.com/apk/res/com.android.launcher3">
+
+    <com.android.launcher3.settings.preferences.CustomSeekBarPreference
+        android:key="pref_overscroll_stiffness"
+        android:title="@string/overscroll_stiffness_title"
+        android:summary="@string/overscroll_stiffness_summary"
+        android:persistent="true"
+        android:max="1000"
+        android:defaultValue="200"
+        settings:min="50"
+        settings:units=""
+        launcher:iconSpaceReserved="false" />
+
+    <com.android.launcher3.settings.preferences.CustomSeekBarPreference
+        android:key="pref_overscroll_damping_ratio"
+        android:title="@string/overscroll_damping_title"
+        android:summary="@string/overscroll_damping_summary"
+        android:persistent="true"
+        android:max="100"
+        android:defaultValue="50"
+        settings:min="10"
+        settings:units="%"
+        launcher:iconSpaceReserved="false" />
+
+    <com.android.launcher3.settings.preferences.CustomSeekBarPreference
+        android:key="pref_overscroll_max_stretch"
+        android:title="@string/overscroll_max_stretch_title"
+        android:summary="@string/overscroll_max_stretch_summary"
+        android:persistent="true"
+        android:max="40"
+        android:defaultValue="15"
+        settings:min="5"
+        settings:units="%"
+        launcher:iconSpaceReserved="false" />
+
+    <com.android.launcher3.settings.preferences.CustomSeekBarPreference
+        android:key="pref_overscroll_velocity_scale"
+        android:title="@string/overscroll_velocity_scale_title"
+        android:summary="@string/overscroll_velocity_scale_summary"
+        android:persistent="true"
+        android:max="200"
+        android:defaultValue="25"
+        settings:min="10"
+        settings:units="%"
+        launcher:iconSpaceReserved="false" />
+
+    <com.android.launcher3.settings.preference.RestartPreference
+        android:key="pref_restart"
+        android:title="@string/pref_restart_title"
+        android:summary="@string/pref_restart_summary" />
+
+</androidx.preference.PreferenceScreen>

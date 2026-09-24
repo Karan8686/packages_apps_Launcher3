@@ -1,0 +1,756 @@
+/*
+ * Copyright (C) 2020 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.android.quickstep.views;
+
+import static com.android.launcher3.util.OverviewReleaseFlags.enableGridOnlyOverview;
+
+import android.app.ActivityManager;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.res.Configuration;
+import android.graphics.Rect;
+import android.util.AttributeSet;
+import android.view.HapticFeedbackConstants;
+import android.util.Log;
+import android.util.TypedValue;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.view.animation.PathInterpolator;
+import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.Toast;
+import android.widget.TextView;
+
+import androidx.annotation.IntDef;
+import androidx.annotation.Nullable;
+
+import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.Insettable;
+import com.android.launcher3.LauncherPrefs;
+import com.android.launcher3.R;
+import com.android.launcher3.Utilities;
+import com.android.launcher3.anim.AnimatedFloat;
+import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.MemoryUtils;
+import com.android.launcher3.util.MultiValueAlpha;
+import com.android.launcher3.util.NavigationMode;
+import com.android.launcher3.util.VibratorWrapper;
+import com.android.quickstep.TaskOverlayFactory.OverlayUICallbacks;
+import com.android.quickstep.util.LayoutUtils;
+import com.android.wm.shell.shared.TypefaceUtils;
+import com.android.wm.shell.shared.TypefaceUtils.FontFamily;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.util.Arrays;
+
+import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
+
+/**
+ * View for showing action buttons in Overview
+ */
+public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayout
+        implements OnClickListener, Insettable, SharedPreferences.OnSharedPreferenceChangeListener {
+
+    public static final String TAG = "OverviewActionsView";
+
+    private static final AccelerateInterpolator PRESS_DOWN_INTERPOLATOR = new AccelerateInterpolator(1.5f);
+    private static final OvershootInterpolator SPRING_BACK_INTERPOLATOR = new OvershootInterpolator(2.5f);
+
+    private static final boolean DEBUG = false;
+    private final Rect mInsets = new Rect();
+
+    /**
+     * We need to over-ride here due to liveTile mode, the [OverviewInputConsumer] is added, which
+     * consumes all [InputEvent]'s and focus isn't moved correctly.
+     */
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getAction() != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(event);
+
+        View currentFocus = findFocus();
+        if (currentFocus == null) return super.dispatchKeyEvent(event);
+
+        View nextFocus = null;
+        switch (event.getKeyCode()) {
+            case KeyEvent.KEYCODE_DPAD_LEFT -> nextFocus = focusSearch(currentFocus,
+                    FOCUS_BACKWARD);
+            case KeyEvent.KEYCODE_DPAD_RIGHT -> nextFocus = focusSearch(currentFocus,
+                    FOCUS_FORWARD);
+            case KeyEvent.KEYCODE_TAB -> nextFocus = focusSearch(currentFocus,
+                    event.isShiftPressed() ? FOCUS_BACKWARD : FOCUS_FORWARD);
+        }
+
+        if (nextFocus != null) {
+            return nextFocus.requestFocus();
+        }
+
+        return super.dispatchKeyEvent(event);
+    }
+
+    @IntDef(flag = true, value = {
+            HIDDEN_NON_ZERO_ROTATION,
+            HIDDEN_NO_TASKS,
+            HIDDEN_NO_RECENTS,
+            HIDDEN_SPLIT_SCREEN,
+            HIDDEN_SPLIT_SELECT_ACTIVE,
+            HIDDEN_ACTIONS_IN_MENU,
+            HIDDEN_DESKTOP
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface ActionsHiddenFlags { }
+
+    public static final int HIDDEN_NON_ZERO_ROTATION = 1 << 0;
+    public static final int HIDDEN_NO_TASKS = 1 << 1;
+    public static final int HIDDEN_NO_RECENTS = 1 << 2;
+    public static final int HIDDEN_SPLIT_SCREEN = 1 << 3;
+    public static final int HIDDEN_SPLIT_SELECT_ACTIVE = 1 << 4;
+    public static final int HIDDEN_ACTIONS_IN_MENU = 1 << 5;
+    public static final int HIDDEN_DESKTOP = 1 << 6;
+
+    @IntDef(flag = true, value = {
+            DISABLED_SCROLLING,
+            DISABLED_ROTATED,
+            DISABLED_NO_THUMBNAIL})
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface ActionsDisabledFlags { }
+
+    public static final int DISABLED_SCROLLING = 1 << 0;
+    public static final int DISABLED_ROTATED = 1 << 1;
+    public static final int DISABLED_NO_THUMBNAIL = 1 << 2;
+
+    private static final int INDEX_CONTENT_ALPHA = 0;
+    private static final int INDEX_VISIBILITY_ALPHA = 1;
+    private static final int INDEX_FULLSCREEN_ALPHA = 2;
+    private static final int INDEX_HIDDEN_FLAGS_ALPHA = 3;
+    // The alpha on the actions view as a result of the share targets being present
+    private static final int INDEX_SHARE_TARGET_ALPHA = 4;
+    private static final int INDEX_SCROLL_ALPHA = 5;
+    private static final int INDEX_GROUPED_ALPHA = 6;
+    private static final int INDEX_3P_LAUNCHER = 7;
+    private static final int NUM_ALPHAS = 8;
+
+    public @interface SplitButtonHiddenFlags { }
+    public static final int FLAG_SMALL_SCREEN_HIDE_SPLIT = 1 << 0;
+
+    /**
+     * Holds an AnimatedFloat for each alpha property, used to set or animate alpha values in
+     * {@link #mMultiValueAlphas}.
+     */
+    private final AnimatedFloat[] mAlphaProperties = new AnimatedFloat[NUM_ALPHAS];
+
+    /** Holds MultiValueAlpha values for all actions bars */
+    private final MultiValueAlpha[] mMultiValueAlphas = new MultiValueAlpha[2];
+    /** Index used for single-task actions in the mMultiValueAlphas array */
+    private static final int ACTIONS_ALPHAS = 0;
+    /** Index used for grouped-task actions in the mMultiValueAlphas array */
+    private static final int GROUP_ACTIONS_ALPHAS = 1;
+
+    /** Container for the action buttons below a focused, non-split Overview tile. */
+    protected LinearLayout mActionButtons;
+    private boolean mIsNewStyle;
+    private ImageButton mSplitButton;
+    /**
+     * The "save app pair" button. Currently this is the only button that is not contained in
+     * mActionButtons, since it is the sole button that appears for a grouped task.
+     */
+    private ImageButton mSaveAppPairButton;
+    private Button mSplitButtonLegacy;
+    private Button mSaveAppPairButtonLegacy;
+
+    @ActionsHiddenFlags
+    private int mHiddenFlags;
+
+    @ActionsDisabledFlags
+    protected int mDisabledFlags;
+
+    @SplitButtonHiddenFlags
+    private int mSplitButtonHiddenFlags;
+
+    @Nullable
+    protected T mCallbacks;
+
+    @Nullable
+    protected DeviceProfile mDp;
+    private final Rect mTaskSize = new Rect();
+    private boolean mIsGroupedTask = false;
+    private boolean mCanSaveAppPair = false;
+
+    private boolean mScreenshot;
+    private boolean mClearAll;
+    private boolean mLens;
+
+    private SharedPreferences mPrefs;
+    private boolean mPrefsRegistered;
+
+    private boolean mIsPerformingMemoryBoost;
+    private View mClearAllButton;
+    private View mLockPillContainer;
+    private TextView mLockPillText;
+    private ImageView mLockPillIcon;
+    private boolean mLockPillShowing = false;
+    private boolean mLockPillAtThreshold = false;
+    private boolean mLockPillInitialLocked = false;
+
+    private static final long LOCK_PILL_FADE_DURATION = 180L;
+    private static final PathInterpolator LOCK_PILL_INTERP =
+            new PathInterpolator(0.2f, 0f, 0f, 1f);
+
+    public OverviewActionsView(Context context) {
+        this(context, null);
+    }
+
+    public OverviewActionsView(Context context, @Nullable AttributeSet attrs) {
+        this(context, attrs, 0);
+    }
+
+    public OverviewActionsView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr, 0);
+        mPrefs = LauncherPrefs.getPrefs(context);
+        mIsNewStyle = LauncherPrefs.RECENTS_NEW_OVERVIEW_STYLE.get(context);
+        mScreenshot = LauncherPrefs.RECENTS_SCREENSHOT.get(context);
+        mClearAll = LauncherPrefs.RECENTS_CLEAR_ALL.get(context);
+        mLens = LauncherPrefs.RECENTS_LENS.get(context);
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (!mPrefsRegistered) {
+            mPrefs.registerOnSharedPreferenceChangeListener(this);
+            mPrefsRegistered = true;
+        }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        setCallbacks(null);
+        clearChildClickListeners();
+        if (mPrefsRegistered) {
+            mPrefs.unregisterOnSharedPreferenceChangeListener(this);
+            mPrefsRegistered = false;
+        }
+        super.onDetachedFromWindow();
+    }
+
+    private void clearChildClickListeners() {
+        View v;
+        if ((v = findViewById(R.id.action_screenshot)) != null) v.setOnClickListener(null);
+        if ((v = findViewById(R.id.action_split)) != null) v.setOnClickListener(null);
+        if ((v = findViewById(R.id.action_save_app_pair)) != null) v.setOnClickListener(null);
+        if ((v = findViewById(R.id.action_clear_all)) != null) v.setOnClickListener(null);
+        if ((v = findViewById(R.id.action_lens)) != null) v.setOnClickListener(null);
+    }
+
+    @Override
+    protected void onFinishInflate() {
+        super.onFinishInflate();
+
+        mClearAllButton = findViewById(R.id.action_clear_all);
+        mClearAllButton.setOnClickListener(this);
+        mClearAllButton.setOnLongClickListener(v -> {
+            performMemoryBoost();
+            return true;
+        });
+        // Initialize 2 view containers: one for single tasks, one for grouped tasks.
+        // These will take up the same space on the screen and alternate visibility as needed.
+        // Currently, the only grouped task action is "save app pairs".
+        mActionButtons = findViewById(R.id.action_buttons);
+        if (mIsNewStyle) {
+            mSaveAppPairButton = findViewById(R.id.action_save_app_pair);
+            mMultiValueAlphas[ACTIONS_ALPHAS] = new MultiValueAlpha(mActionButtons, NUM_ALPHAS);
+            mMultiValueAlphas[GROUP_ACTIONS_ALPHAS] =
+                    new MultiValueAlpha(mSaveAppPairButton, NUM_ALPHAS);
+        } else {
+            mSaveAppPairButtonLegacy = findViewById(R.id.action_save_app_pair);
+            TypefaceUtils.setTypeface(mSaveAppPairButtonLegacy, FontFamily.GSF_LABEL_LARGE);
+            mMultiValueAlphas[ACTIONS_ALPHAS] = new MultiValueAlpha(mActionButtons, NUM_ALPHAS);
+            mMultiValueAlphas[GROUP_ACTIONS_ALPHAS] =
+                    new MultiValueAlpha(mSaveAppPairButtonLegacy, NUM_ALPHAS);
+        }
+        Arrays.stream(mMultiValueAlphas).forEach(a -> a.setUpdateVisibility(true));
+        // To control alpha simultaneously on mActionButtons and any group action buttons, we set up
+        // an AnimatedFloat for each alpha property.
+        for (int i = 0; i < NUM_ALPHAS; i++) {
+            final int index = i;
+            mAlphaProperties[index] = new AnimatedFloat(() -> {
+                for (MultiValueAlpha multiValueAlpha : mMultiValueAlphas) {
+                    multiValueAlpha.get(index).setValue(mAlphaProperties[index].value);
+                }
+            }, 1f /* initialValue */);
+        }
+        mLockPillContainer = findViewById(R.id.lock_pill_container);
+        mLockPillText = findViewById(R.id.lock_pill_text);
+        mLockPillIcon = findViewById(R.id.lock_pill_icon);
+        updateVisibilities();
+    }
+
+    public void showLockPill(boolean isCurrentlyLocked) {
+        if (mLockPillContainer == null || mLockPillShowing) return;
+        mLockPillShowing = true;
+        mLockPillAtThreshold = false;
+        mLockPillInitialLocked = isCurrentlyLocked;
+        mLockPillIcon.setImageResource(isCurrentlyLocked
+                ? R.drawable.ic_protected_unlocked
+                : R.drawable.ic_protected_locked);
+        applyLockPillState();
+        mLockPillContainer.setAlpha(0f);
+        mLockPillContainer.setScaleX(0.85f);
+        mLockPillContainer.setScaleY(0.85f);
+        mLockPillContainer.setVisibility(VISIBLE);
+        mLockPillContainer.animate()
+                .alpha(1f).scaleX(1f).scaleY(1f)
+                .setInterpolator(LOCK_PILL_INTERP)
+                .setDuration(LOCK_PILL_FADE_DURATION).start();
+        mActionButtons.animate().alpha(0f).setDuration(LOCK_PILL_FADE_DURATION).start();
+    }
+
+    public void setLockPillAtThreshold(boolean atThreshold) {
+        if (mLockPillContainer == null || !mLockPillShowing) return;
+        if (mLockPillAtThreshold == atThreshold) return;
+        mLockPillAtThreshold = atThreshold;
+        applyLockPillState();
+    }
+
+    private void applyLockPillState() {
+        int textRes;
+        if (mLockPillAtThreshold) {
+            textRes = mLockPillInitialLocked
+                    ? R.string.unlock_app_release_to_confirm
+                    : R.string.lock_app_release_to_confirm;
+        } else {
+            textRes = mLockPillInitialLocked
+                    ? R.string.unlock_app_prompt
+                    : R.string.lock_app_prompt;
+        }
+        mLockPillText.setText(textRes);
+    }
+
+    public void hideLockPill() {
+        if (mLockPillContainer == null || !mLockPillShowing) return;
+        mLockPillShowing = false;
+        mLockPillContainer.animate()
+                .alpha(0f)
+                .setInterpolator(LOCK_PILL_INTERP)
+                .setDuration(LOCK_PILL_FADE_DURATION).withEndAction(() ->
+                        mLockPillContainer.setVisibility(GONE)).start();
+        mActionButtons.animate().alpha(1f).setDuration(LOCK_PILL_FADE_DURATION).start();
+    }
+
+    private void updateVisibilities() {
+        // The screenshot button is implemented as a Button in launcher3 and NexusLauncher, but is
+        // an ImageButton in go launcher (does not share a common class with Button). Take care when
+        // casting this.
+        View screenshotButton = findViewById(R.id.action_screenshot);
+        View screenshotButtonSpace = mIsNewStyle ? findViewById(R.id.action_screenshot_space) : null;
+        screenshotButton.setOnClickListener(this);
+        screenshotButton.setVisibility(mScreenshot ? VISIBLE : GONE);
+        if (screenshotButtonSpace != null) screenshotButtonSpace.setVisibility(mScreenshot ? VISIBLE : GONE);
+
+        if (mIsNewStyle) {
+            mSplitButton = findViewById(R.id.action_split);
+            mSplitButton.setOnClickListener(this);
+            mSaveAppPairButton.setOnClickListener(this);
+        } else {
+            mSplitButtonLegacy = findViewById(R.id.action_split);
+            mSplitButtonLegacy.setOnClickListener(this);
+            mSaveAppPairButtonLegacy.setOnClickListener(this);
+        }
+
+        View clearallButton = findViewById(R.id.action_clear_all);
+        View clearallButtonSpace = mIsNewStyle ? findViewById(R.id.clear_all_container) : null;
+        clearallButton.setOnClickListener(this);
+        clearallButton.setVisibility(mClearAll ? VISIBLE : GONE);
+        if (clearallButtonSpace != null) clearallButtonSpace.setVisibility(mClearAll ? VISIBLE : GONE);
+
+        View lensButton = findViewById(R.id.action_lens);
+        View lensButtonSpace = mIsNewStyle ? findViewById(R.id.action_lens_space) : null;
+        lensButton.setOnClickListener(this);
+        lensButton.setVisibility(mLens && Utilities.isGSAEnabled(getContext()) ? VISIBLE : GONE);
+        if (lensButtonSpace != null) lensButtonSpace.setVisibility(mLens && Utilities.isGSAEnabled(getContext()) ? VISIBLE : GONE);
+
+        if (mIsNewStyle) {
+            updateSecondActionsRowVisibility();
+        }
+    }
+
+    private void updateSecondActionsRowVisibility() {
+        View row = findViewById(R.id.second_overview_actions_container);
+        if (row == null) return;
+
+        View screenshotButton = findViewById(R.id.action_screenshot);
+        View splitButton = mSplitButton != null ? mSplitButton : findViewById(R.id.action_split);
+        View lensButton = findViewById(R.id.action_lens);
+
+        boolean anyVisible =
+                (screenshotButton != null && screenshotButton.getVisibility() == VISIBLE)
+                        || (splitButton != null && splitButton.getVisibility() == VISIBLE)
+                        || (lensButton != null && lensButton.getVisibility() == VISIBLE);
+
+        row.setVisibility(anyVisible ? VISIBLE : GONE);
+    }
+
+    private void animateButtonPress(View view, @Nullable Runnable onPhase1Complete) {
+        view.animate()
+                .scaleX(0.88f)
+                .scaleY(0.88f)
+                .alpha(0.75f)
+                .setDuration(100)
+                .setInterpolator(PRESS_DOWN_INTERPOLATOR)
+                .withEndAction(() -> {
+                    if (onPhase1Complete != null) {
+                        onPhase1Complete.run();
+                    }
+                    view.animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .alpha(1f)
+                            .setDuration(200)
+                            .setInterpolator(SPRING_BACK_INTERPOLATOR)
+                            .start();
+                })
+                .start();
+    }
+
+    private void performMemoryBoost() {
+        if (mIsPerformingMemoryBoost) {
+            return;
+        }
+        
+        View clearAllButton = findViewById(R.id.action_clear_all);
+        if (clearAllButton == null) {
+            return;
+        }
+        
+        mIsPerformingMemoryBoost = true;
+        clearAllButton.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+        animateButtonPress(clearAllButton, () ->
+                UI_HELPER_EXECUTOR.execute(() -> {
+                    MemoryUtils.releaseMemory();
+                    clearAllButton.postDelayed(() -> {
+                        mIsPerformingMemoryBoost = false;
+                        Toast.makeText(getContext(),
+                                R.string.memory_boost_applied,
+                                Toast.LENGTH_SHORT).show();
+                    }, 500);
+                }));
+    }
+
+    public void setMemoryBoostInProgress(boolean inProgress) {
+        if (mIsPerformingMemoryBoost == inProgress) return;
+        mIsPerformingMemoryBoost = inProgress;
+        View clearAllButton = findViewById(R.id.action_clear_all);
+        if (clearAllButton != null) {
+            clearAllButton.animate()
+                .scaleX(inProgress ? 0.95f : 1f)
+                .scaleY(inProgress ? 0.95f : 1f)
+                .alpha(inProgress ? 0.8f : 1f)
+                .setDuration(100)
+                .start();
+        }
+    }
+
+    /**
+     * Set listener for callbacks on action button taps.
+     *
+     * @param callbacks for callbacks, or {@code null} to clear the listener.
+     */
+    public void setCallbacks(@Nullable T callbacks) {
+        mCallbacks = callbacks;
+    }
+
+    @Override
+    public void onClick(View view) {
+        if (mCallbacks == null) {
+            return;
+        }
+        final int id = view.getId();
+        if (id == R.id.action_screenshot) {
+            VibratorWrapper.INSTANCE.get(getContext()).vibrate(VibratorWrapper.EFFECT_CLICK);
+            animateButtonPress(view, mCallbacks::onScreenshot);
+        } else if (id == R.id.action_split) {
+            VibratorWrapper.INSTANCE.get(getContext()).vibrate(VibratorWrapper.EFFECT_CLICK);
+            animateButtonPress(view, mCallbacks::onSplit);
+        } else if (id == R.id.action_save_app_pair) {
+            VibratorWrapper.INSTANCE.get(getContext()).vibrate(VibratorWrapper.EFFECT_CLICK);
+            animateButtonPress(view, mCallbacks::onSaveAppPair);
+        } else if (id == R.id.action_clear_all) {
+            VibratorWrapper.INSTANCE.get(getContext()).vibrate(VibratorWrapper.EFFECT_CLICK);
+            animateButtonPress(view, mCallbacks::onClearAllTasksRequested);
+        } else if (id == R.id.action_lens) {
+            VibratorWrapper.INSTANCE.get(getContext()).vibrate(VibratorWrapper.EFFECT_CLICK);
+            animateButtonPress(view, mCallbacks::onLens);
+        }
+    }
+
+    @Override
+    protected void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        updateVerticalMargin(DisplayController.getNavigationMode(getContext()));
+    }
+
+    @Override
+    public void setInsets(Rect insets) {
+        mInsets.set(insets);
+        updateVerticalMargin(DisplayController.getNavigationMode(getContext()));
+        updatePadding();
+    }
+
+    @Override
+    public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
+        if (LauncherPrefs.RECENTS_SCREENSHOT.getSharedPrefKey().equals(key)) {
+            mScreenshot = prefs.getBoolean(key, true);
+        } else if (LauncherPrefs.RECENTS_CLEAR_ALL.getSharedPrefKey().equals(key)) {
+            mClearAll = prefs.getBoolean(key, true);
+        } else if (LauncherPrefs.RECENTS_LENS.getSharedPrefKey().equals(key)) {
+            mLens = prefs.getBoolean(key, false);
+        }
+        updateVisibilities();
+    }
+
+    public void updateHiddenFlags(@ActionsHiddenFlags int visibilityFlags, boolean enable) {
+        if (enable) {
+            mHiddenFlags |= visibilityFlags;
+        } else {
+            mHiddenFlags &= ~visibilityFlags;
+        }
+        boolean isHidden = mHiddenFlags != 0;
+        mAlphaProperties[INDEX_HIDDEN_FLAGS_ALPHA].updateValue(isHidden ? 0 : 1);
+    }
+
+    /**
+     * Updates the proper disabled flag to indicate whether OverviewActionsView should be enabled.
+     * Ignores DISABLED_ROTATED flag for determining enabled. Flag is used to enable/disable
+     * buttons individually, currently done for select button in subclass.
+     *
+     * @param disabledFlags The flag to update.
+     * @param enable        Whether to enable the disable flag: True will cause view to be disabled.
+     */
+    public void updateDisabledFlags(@ActionsDisabledFlags int disabledFlags, boolean enable) {
+        if (enable) {
+            mDisabledFlags |= disabledFlags;
+        } else {
+            mDisabledFlags &= ~disabledFlags;
+        }
+        boolean isEnabled = (mDisabledFlags & ~DISABLED_ROTATED) == 0;
+        LayoutUtils.setViewEnabled(this, isEnabled);
+    }
+
+    /**
+     * Updates a batch of flags to hide and show actions buttons when a grouped task (split screen)
+     * is focused.
+     * @param isGroupedTask True if the focused task is a grouped task.
+     * @param canSaveAppPair True if the focused task is a grouped task and can be saved as an app
+     *                      pair.
+     */
+    public void updateForGroupedTask(boolean isGroupedTask, boolean canSaveAppPair) {
+        if (DEBUG) {
+            Log.d(TAG, "updateForGroupedTask() called with: isGroupedTask = [" + isGroupedTask
+                    + "], canSaveAppPair = [" + canSaveAppPair + "]");
+        }
+        mIsGroupedTask = isGroupedTask;
+        mCanSaveAppPair = canSaveAppPair;
+        updateActionButtonsVisibility();
+    }
+
+    /**
+     * Updates a batch of flags to hide and show actions buttons for tablet/non tablet case.
+     */
+    private void updateForIsTablet() {
+        assert mDp != null;
+        // Update flags to see if split button should be hidden.
+        updateSplitButtonHiddenFlags(FLAG_SMALL_SCREEN_HIDE_SPLIT,
+                !mDp.getDeviceProperties().isTablet() ||
+                getContext().getSystemService(ActivityManager.class).isLowRamDevice());
+        updateActionButtonsVisibility();
+    }
+
+    private void updateActionButtonsVisibility() {
+        if (mDp == null) {
+            return;
+        }
+        boolean showSingleTaskActions = !mIsGroupedTask;
+        boolean showGroupActions = mIsGroupedTask && mDp.getDeviceProperties().isTablet() &&
+                mCanSaveAppPair &&
+                !getContext().getSystemService(ActivityManager.class).isLowRamDevice();
+        if (DEBUG) {
+            Log.d(TAG, "updateActionButtonsVisibility() called: showSingleTaskActions = ["
+                    + showSingleTaskActions + "], showGroupActions = [" + showGroupActions + "]");
+        }
+        getActionsAlphas().get(INDEX_GROUPED_ALPHA).setValue(showSingleTaskActions ? 1 : 0);
+        getGroupActionsAlphas().get(INDEX_GROUPED_ALPHA).setValue(showGroupActions ? 1 : 0);
+    }
+
+    /**
+     * Updates flags to hide and show actions buttons for 1p/3p launchers.
+     */
+    public void updateFor3pLauncher(boolean is3pLauncher) {
+        getGroupActionsAlphas().get(INDEX_3P_LAUNCHER).setValue(is3pLauncher ? 0 : 1);
+    }
+
+    private MultiValueAlpha getActionsAlphas() {
+        return mMultiValueAlphas[ACTIONS_ALPHAS];
+    }
+
+    private MultiValueAlpha getGroupActionsAlphas() {
+        return mMultiValueAlphas[GROUP_ACTIONS_ALPHAS];
+    }
+
+    /**
+     * Updates the proper flags to indicate whether the "Split screen" button should be hidden.
+     *
+     * @param flag   The flag to update.
+     * @param enable Whether to enable the hidden flag: True will cause view to be hidden.
+     */
+    void updateSplitButtonHiddenFlags(@SplitButtonHiddenFlags int flag, boolean enable) {
+        View splitButton = mIsNewStyle ? mSplitButton : mSplitButtonLegacy;
+        if (splitButton == null) return;
+        if (enable) {
+            mSplitButtonHiddenFlags |= flag;
+        } else {
+            mSplitButtonHiddenFlags &= ~flag;
+        }
+        int desiredVisibility = mSplitButtonHiddenFlags == 0 ? VISIBLE : GONE;
+        if (splitButton.getVisibility() != desiredVisibility) {
+            splitButton.setVisibility(desiredVisibility);
+            if (mIsNewStyle) {
+                View splitButtonSpace = findViewById(R.id.action_split_space);
+                if (splitButtonSpace != null) splitButtonSpace.setVisibility(desiredVisibility);
+            }
+            mActionButtons.requestLayout();
+
+            if (mIsNewStyle) {
+                updateSecondActionsRowVisibility();
+            }
+        }
+    }
+
+    public AnimatedFloat getContentAlpha() {
+        return mAlphaProperties[INDEX_CONTENT_ALPHA];
+    }
+
+    public AnimatedFloat getVisibilityAlpha() {
+        return mAlphaProperties[INDEX_VISIBILITY_ALPHA];
+    }
+
+    public AnimatedFloat getFullscreenAlpha() {
+        return mAlphaProperties[INDEX_FULLSCREEN_ALPHA];
+    }
+
+    public AnimatedFloat getShareTargetAlpha() {
+        return mAlphaProperties[INDEX_SHARE_TARGET_ALPHA];
+    }
+
+    public AnimatedFloat getIndexScrollAlpha() {
+        return mAlphaProperties[INDEX_SCROLL_ALPHA];
+    }
+
+    /**
+     * Returns the visibility of the overview actions buttons.
+     */
+    public boolean areActionsButtonsVisible() {
+        return mActionButtons.getVisibility() == View.VISIBLE
+                || (mIsNewStyle ? mSaveAppPairButton : mSaveAppPairButtonLegacy).getVisibility() == View.VISIBLE;
+    }
+
+    /**
+     * Offsets OverviewActionsView horizontal position based on 3 button nav container in taskbar.
+     */
+    private void updatePadding() {
+        // If taskbar is in overview, overview action has dedicated space above nav buttons
+        setPadding(mInsets.left, 0, mInsets.right, 0);
+    }
+
+    /** Updates vertical margins for different navigation mode or configuration changes. */
+    public void updateVerticalMargin(NavigationMode mode) {
+        updateActionBarPosition(mActionButtons);
+        updateActionBarPosition(mIsNewStyle ? mSaveAppPairButton : mSaveAppPairButtonLegacy);
+    }
+
+    /** Positions actions buttons according to device settings and insets. */
+    private void updateActionBarPosition(View actionBar) {
+        if (mDp == null) {
+            return;
+        }
+
+        LayoutParams actionParams = (LayoutParams) actionBar.getLayoutParams();
+        actionParams.setMargins(
+                actionParams.leftMargin, mDp.getOverviewProfile().getActionsTopMarginPx(),
+                actionParams.rightMargin, getBottomMargin());
+    }
+
+    private int getBottomMargin() {
+        if (mDp == null) {
+            return 0;
+        }
+
+        if (mDp.getDeviceProperties().isTablet() && enableGridOnlyOverview()) {
+            int modalTaskbarHeight = mDp.getTaskbarProfile().isTransientTaskbar()
+                    ? mDp.getTaskbarProfile().getStashedTaskbarHeight()
+                    : mDp.getTaskbarProfile().getHeight();
+            return modalTaskbarHeight + mDp.getOverviewProfile().getActionsTopMarginPx();
+        }
+
+        if (!mIsNewStyle) {
+            return getResources().getDimensionPixelSize(R.dimen.overview_actions_bottom_margin_legacy);
+        }
+
+        // Align to bottom of task Rect.
+        return mDp.getDeviceProperties().getHeightPx()
+                - mTaskSize.bottom
+                - mDp.getOverviewProfile().getActionsTopMarginPx()
+                - mDp.getOverviewProfile().getActionsHeight();
+    }
+
+    /**
+     * Updates device profile and task size for this view to draw with.
+     */
+    public void updateDimension(DeviceProfile dp, Rect taskSize) {
+        mDp = dp;
+        mTaskSize.set(taskSize);
+        updateVerticalMargin(DisplayController.getNavigationMode(getContext()));
+        updateForIsTablet();
+
+        requestLayout();
+
+        if (mIsNewStyle) {
+            int splitIconRes = dp.isLeftRightSplit
+                    ? R.drawable.ic_split_horizontal
+                    : R.drawable.ic_split_vertical;
+            mSplitButton.setImageResource(splitIconRes);
+
+            int appPairIconRes = dp.isLeftRightSplit
+                    ? R.drawable.ic_save_app_pair_left_right
+                    : R.drawable.ic_save_app_pair_up_down;
+            mSaveAppPairButton.setImageResource(appPairIconRes);
+        } else {
+            mSplitButtonLegacy.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    dp.isLeftRightSplit ? R.drawable.ic_split_horizontal : R.drawable.ic_split_vertical,
+                    0, 0, 0);
+            mSaveAppPairButtonLegacy.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    dp.isLeftRightSplit ? R.drawable.ic_save_app_pair_left_right
+                                        : R.drawable.ic_save_app_pair_up_down,
+                    0, 0, 0);
+        }
+    }
+}
