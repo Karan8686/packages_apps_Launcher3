@@ -39,23 +39,31 @@ import static com.android.launcher3.icons.cache.CacheLookupFlag.DEFAULT_LOOKUP_F
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_INCREMENTAL_DOWNLOAD_ACTIVE;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_INSTALL_SESSION_ACTIVE;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_SHOW_DOWNLOAD_PROGRESS_MASK;
+import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 import static com.android.launcher3.util.MultiTranslateDelegate.INDEX_TASKBAR_APP_RUNNING_STATE_ANIM;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.Context;
+import android.view.animation.Interpolator;
+import android.view.animation.PathInterpolator;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.icu.text.MessageFormat;
 import android.text.Spannable;
+import android.util.Pair;
 import android.text.SpannableString;
 import android.text.StaticLayout;
 import android.text.TextPaint;
@@ -94,6 +102,7 @@ import com.android.launcher3.icons.DotRenderer;
 import com.android.launcher3.icons.DotRenderer.IconShapeInfo;
 import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.icons.IconCache.ItemInfoUpdateReceiver;
+import com.android.launcher3.icons.LauncherIcons;
 import com.android.launcher3.icons.PlaceHolderDrawableDelegate;
 import com.android.launcher3.icons.cache.CacheLookupFlag;
 import com.android.launcher3.model.data.AppInfo;
@@ -269,6 +278,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     private boolean mHighResUpdateInProgress = false;
 
+    private AdaptiveIconDrawable mSuperIconAdaptiveDrawable;
+    private Drawable mSuperIconBadge;
+    private boolean mIsLoadingSuperIcon = false;
+
     public BubbleTextView(Context context) {
         this(context, null, 0);
     }
@@ -412,6 +425,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             mIconLoadRequest.cancel();
             mIconLoadRequest = null;
         }
+        mSuperIconAdaptiveDrawable = null;
+        mSuperIconBadge = null;
+        mIsLoadingSuperIcon = false;
         // Reset any shifty arrangements in case animation is disrupted.
         setPivotY(0);
         setAlpha(1);
@@ -458,6 +474,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
         applyDotState(info, false /* animate */);
         setDownloadStateContentDescription(info, info.getProgressLevel());
+        if (isMultiSpan()) {
+            loadSuperIconDrawableIfNecessary();
+        }
     }
 
     @UiThread
@@ -485,6 +504,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         verifyHighRes();
 
         setDownloadStateContentDescription(info, info.getProgressLevel());
+        if (isMultiSpan()) {
+            loadSuperIconDrawableIfNecessary();
+        }
     }
 
     /**
@@ -807,9 +829,20 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     }
 
     @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (isMultiSpan() && mSuperIconAdaptiveDrawable == null && !mIsLoadingSuperIcon) {
+            loadSuperIconDrawableIfNecessary();
+        }
+    }
+
+    @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         checkForEllipsis();
+        if (isMultiSpan() && mSuperIconAdaptiveDrawable == null && !mIsLoadingSuperIcon) {
+            loadSuperIconDrawableIfNecessary();
+        }
     }
 
     @Override
@@ -877,8 +910,253 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         super.onDraw(canvas);
     }
 
+    public boolean isMultiSpan() {
+        if (mDisplay != DISPLAY_WORKSPACE) return false;
+        return getSpanX() > 1 || getSpanY() > 1;
+    }
+
+    public int getSpanX() {
+        if (getLayoutParams() instanceof CellLayoutLayoutParams lp) {
+            return lp.cellHSpan;
+        }
+        if (getTag() instanceof ItemInfo itemInfo) {
+            return itemInfo.spanX;
+        }
+        return 1;
+    }
+
+    public int getSpanY() {
+        if (getLayoutParams() instanceof CellLayoutLayoutParams lp) {
+            return lp.cellVSpan;
+        }
+        if (getTag() instanceof ItemInfo itemInfo) {
+            return itemInfo.spanY;
+        }
+        return 1;
+    }
+
+    public Rect getMultiSpanBackgroundBounds() {
+        Rect outBounds = new Rect();
+        int spanX = getSpanX();
+        int spanY = getSpanY();
+        if (spanX <= 1 && spanY <= 1) {
+            getIconBounds(outBounds);
+            return outBounds;
+        }
+
+        int iconSize = mDeviceProfile.getWorkspaceIconProfile().getIconSizePx();
+        int previewSize = mDeviceProfile.folderIconSizePx;
+        int cellWidth = mDeviceProfile.getWorkspaceIconProfile().getCellWidthPx();
+        int cellHeight = mDeviceProfile.getWorkspaceIconProfile().getCellHeightPx();
+        Point borderSpace = mDeviceProfile.getWorkspaceIconProfile().getCellLayoutBorderSpacePx();
+
+        int cellPaddingY = mDeviceProfile.getWorkspaceIconProfile().getCellYPaddingPx();
+        if (cellPaddingY <= 0) {
+            int iconTextHeight = Utilities.calculateTextHeight(
+                    mDeviceProfile.getWorkspaceIconProfile().getIconTextSizePx());
+            int contentHeight = iconSize
+                    + mDeviceProfile.getWorkspaceIconProfile().getIconDrawablePaddingPx()
+                    + iconTextHeight;
+            cellPaddingY = Math.max(0, (cellHeight - contentHeight) / 2);
+        }
+
+        int bgWidth = (spanX - 1) * (cellWidth + borderSpace.x) + previewSize;
+        int bgHeight = (spanY - 1) * (cellHeight + borderSpace.y) + previewSize;
+        int bgLeft = (getWidth() - bgWidth) / 2;
+        int bgTop = cellPaddingY + mDeviceProfile.folderIconOffsetYPx;
+
+        outBounds.set(bgLeft, bgTop, bgLeft + bgWidth, bgTop + bgHeight);
+        return outBounds;
+    }
+
+    public float getIconBackgroundCornerRadius() {
+        int spanX = getSpanX();
+        int spanY = getSpanY();
+        Rect bgBounds = getMultiSpanBackgroundBounds();
+        if (spanX == 2 && spanY == 1) {
+            return bgBounds.height() / 2f;
+        } else if (spanX == 1 && spanY == 2) {
+            return bgBounds.width() / 2f;
+        } else if (spanX == 2 && spanY == 2) {
+            return mDeviceProfile.getWorkspaceIconProfile().getIconSizePx() * 0.44f;
+        }
+        return mIconSize / 2f;
+    }
+
+    public void getIconBackgroundPath(Path outPath) {
+        outPath.reset();
+        Rect bgBounds = getMultiSpanBackgroundBounds();
+        float radius = getIconBackgroundCornerRadius();
+        outPath.addRoundRect(new RectF(bgBounds), radius, radius, Path.Direction.CW);
+    }
+
+    private float mSuperIconPressScale = 1.0f;
+    private ValueAnimator mSuperIconPressAnimator;
+    private static final Interpolator OOS_PRESS_INTERPOLATOR =
+            new PathInterpolator(0.4f, 0.0f, 0.2f, 1.0f);
+
+    @Override
+    public void setPressed(boolean pressed) {
+        super.setPressed(pressed);
+        if (isMultiSpan()) {
+            float targetScale = pressed ? 0.96f : 1.0f;
+            if (mSuperIconPressAnimator != null) {
+                mSuperIconPressAnimator.cancel();
+            }
+            mSuperIconPressAnimator = ValueAnimator.ofFloat(mSuperIconPressScale, targetScale);
+            mSuperIconPressAnimator.setDuration(pressed ? 120 : 180);
+            mSuperIconPressAnimator.setInterpolator(OOS_PRESS_INTERPOLATOR);
+            mSuperIconPressAnimator.addUpdateListener(anim -> {
+                mSuperIconPressScale = (float) anim.getAnimatedValue();
+                invalidate();
+            });
+            mSuperIconPressAnimator.start();
+        }
+    }
+
+    public void loadSuperIconDrawableIfNecessary() {
+        if (!isMultiSpan()) {
+            return;
+        }
+        if (mSuperIconAdaptiveDrawable != null || mIsLoadingSuperIcon) {
+            return;
+        }
+        final ItemInfo itemInfo = (getTag() instanceof ItemInfo) ? (ItemInfo) getTag() : null;
+        if (itemInfo == null) {
+            return;
+        }
+        mIsLoadingSuperIcon = true;
+        final int w = getWidth() > 0 ? getWidth() : mIconSize;
+        final int h = getHeight() > 0 ? getHeight() : mIconSize;
+        final boolean useTheme = ThemeManager.INSTANCE.get(getContext()).isIconThemeEnabled();
+        final Context context = getContext();
+
+        MODEL_EXECUTOR.getHandler().postAtFrontOfQueue(() -> {
+            Pair<AdaptiveIconDrawable, Drawable> fullDrawable = null;
+            try {
+                fullDrawable = Utilities.getFullDrawable(
+                        ActivityContext.lookupContext(context),
+                        itemInfo, w, h, useTheme);
+            } catch (Exception e) {
+                Log.e(TAG, "Error loading full drawable for super icon", e);
+            }
+            final Pair<AdaptiveIconDrawable, Drawable> result = fullDrawable;
+            post(() -> {
+                mIsLoadingSuperIcon = false;
+                if (result != null && result.first != null) {
+                    mSuperIconAdaptiveDrawable = result.first;
+                    mSuperIconBadge = result.second;
+                    invalidate();
+                }
+            });
+        });
+    }
+
+    private void drawMultiSpanSuperIcon(Canvas canvas) {
+        Rect bgBounds = getMultiSpanBackgroundBounds();
+        RectF bgRectF = new RectF(bgBounds);
+        float radius = getIconBackgroundCornerRadius();
+
+        canvas.save();
+        if (mSuperIconPressScale != 1.0f) {
+            canvas.scale(mSuperIconPressScale, mSuperIconPressScale, bgRectF.centerX(), bgRectF.centerY());
+        }
+
+        // Clip to the capsule / card shape
+        Path clipPath = new Path();
+        clipPath.addRoundRect(bgRectF, radius, radius, Path.Direction.CW);
+        canvas.clipPath(clipPath);
+
+        if (mSuperIconAdaptiveDrawable == null && !mIsLoadingSuperIcon) {
+            loadSuperIconDrawableIfNecessary();
+        }
+
+        // 1. Draw Background: stretch the app's icon background across the entire capsule/card
+        boolean drewAdaptiveBg = false;
+        if (mSuperIconAdaptiveDrawable != null) {
+            Drawable bg = mSuperIconAdaptiveDrawable.getBackground();
+            if (bg != null) {
+                bg.setBounds(bgBounds.left, bgBounds.top, bgBounds.right, bgBounds.bottom);
+                bg.draw(canvas);
+                drewAdaptiveBg = true;
+            }
+        }
+
+        if (!drewAdaptiveBg) {
+            int fallbackBgColor = 0;
+            if (getTag() instanceof ItemInfoWithIcon iiwi) {
+                fallbackBgColor = iiwi.bitmap.color;
+            }
+            if (fallbackBgColor == 0 || fallbackBgColor == Color.TRANSPARENT) {
+                fallbackBgColor = 0xFF2B2B2B;
+            }
+            Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            bgPaint.setColor(fallbackBgColor);
+            bgPaint.setStyle(Paint.Style.FILL);
+            canvas.drawRect(bgRectF, bgPaint);
+        }
+
+        // 2. Draw Foreground Glyph
+        int spanX = getSpanX();
+        int spanY = getSpanY();
+        int glyphTargetSize;
+
+        if (spanX == 2 && spanY == 1) {
+            glyphTargetSize = Math.round(bgRectF.height() * 0.62f);
+        } else if (spanX == 1 && spanY == 2) {
+            glyphTargetSize = Math.round(bgRectF.width() * 0.62f);
+        } else if (spanX == 2 && spanY == 2) {
+            glyphTargetSize = Math.round(Math.min(bgRectF.width(), bgRectF.height()) * 0.52f);
+        } else {
+            glyphTargetSize = Math.round(Math.min(bgRectF.width(), bgRectF.height()) * 0.62f);
+        }
+
+        boolean drewAdaptiveFg = false;
+        if (mSuperIconAdaptiveDrawable != null) {
+            Drawable fg = mSuperIconAdaptiveDrawable.getForeground();
+            if (fg != null) {
+                // AdaptiveIcon foreground has an intrinsic safe zone ratio of 72 / 108 = 1 / 1.5.
+                // Expanding outer bounds by 1.5x around the center ensures the visible glyph matches glyphTargetSize.
+                int fullFgSize = Math.round(glyphTargetSize * 1.5f);
+                int fgLeft = Math.round(bgRectF.centerX() - fullFgSize / 2f);
+                int fgTop = Math.round(bgRectF.centerY() - fullFgSize / 2f);
+                fg.setBounds(fgLeft, fgTop, fgLeft + fullFgSize, fgTop + fullFgSize);
+                fg.draw(canvas);
+                drewAdaptiveFg = true;
+            }
+        }
+
+        if (!drewAdaptiveFg) {
+            if (mIcon != null) {
+                int iconLeft = Math.round(bgRectF.centerX() - glyphTargetSize / 2f);
+                int iconTop = Math.round(bgRectF.centerY() - glyphTargetSize / 2f);
+                mIcon.setBounds(iconLeft, iconTop, iconLeft + glyphTargetSize, iconTop + glyphTargetSize);
+                mIcon.draw(canvas);
+            }
+        }
+
+        // 3. Draw Badge if present
+        if (mSuperIconBadge != null) {
+            int baseIconSize = mIconSize > 0 ? mIconSize
+                    : mDeviceProfile.getWorkspaceIconProfile().getIconSizePx();
+            int badgeSize = LauncherIcons.getBadgeSizeForIconSize(baseIconSize);
+            int badgePadding = Math.round(8f * getResources().getDisplayMetrics().density);
+            int badgeLeft = bgBounds.right - badgeSize - badgePadding;
+            int badgeTop = bgBounds.bottom - badgeSize - badgePadding;
+            mSuperIconBadge.setBounds(badgeLeft, badgeTop, badgeLeft + badgeSize, badgeTop + badgeSize);
+            mSuperIconBadge.draw(canvas);
+        }
+
+        canvas.restore();
+    }
+
     @Override
     public void onDraw(Canvas canvas) {
+        if (isMultiSpan()) {
+            drawMultiSpanSuperIcon(canvas);
+            drawDotIfNecessary(canvas);
+            return;
+        }
         super.onDraw(canvas);
         drawDotIfNecessary(canvas);
         drawRunningAppIndicatorIfNecessary(canvas);
@@ -891,7 +1169,16 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
      */
     protected void drawDotIfNecessary(Canvas canvas) {
         if (!mForceHideDot && (hasDot() || mDotParams.scale > 0)) {
-            getIconBounds(mDotParams.iconBounds);
+            if (isMultiSpan()) {
+                Rect bgBounds = getMultiSpanBackgroundBounds();
+                mDotParams.iconBounds.set(
+                        bgBounds.right - mIconSize,
+                        bgBounds.top,
+                        bgBounds.right,
+                        bgBounds.top + mIconSize);
+            } else {
+                getIconBounds(mDotParams.iconBounds);
+            }
             Utilities.scaleRectAboutCenter(mDotParams.iconBounds, ICON_VISIBLE_AREA_FACTOR);
             final int scrollX = getScrollX();
             final int scrollY = getScrollY();
@@ -999,6 +1286,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
      * Get the icon bounds on the view depending on the layout type.
      */
     public void getIconBounds(Rect outBounds) {
+        if (isMultiSpan()) {
+            outBounds.set(getMultiSpanBackgroundBounds());
+            return;
+        }
         getIconBounds(mIconSize, outBounds);
     }
 
@@ -1605,10 +1896,18 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     @Override
     public void getWorkspaceVisualDragBounds(Rect bounds) {
+        if (isMultiSpan()) {
+            bounds.set(getMultiSpanBackgroundBounds());
+            return;
+        }
         getIconBounds(mIconSize, bounds);
     }
 
     public void getSourceVisualDragBounds(Rect bounds) {
+        if (isMultiSpan()) {
+            bounds.set(getMultiSpanBackgroundBounds());
+            return;
+        }
         getIconBounds(mIconSize, bounds);
     }
 

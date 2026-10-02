@@ -33,6 +33,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
@@ -45,6 +46,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewDebug;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
@@ -64,6 +66,7 @@ import com.android.launcher3.LauncherState;
 import com.android.launcher3.OnAlarmListener;
 import com.android.launcher3.R;
 import com.android.launcher3.Reorderable;
+import com.android.launcher3.ShortcutAndWidgetContainer;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
@@ -202,7 +205,10 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
     public int getFolderLabelHeight() {
         if (shouldShowFolderName() && mFolderName != null) {
             Paint.FontMetrics fm = mFolderName.getPaint().getFontMetrics();
-            return mFolderName.getCompoundDrawablePadding() + (int) Math.ceil(fm.bottom - fm.top);
+            int iconPadding = mActivity != null
+                    ? mActivity.getDeviceProfile().getWorkspaceIconProfile().getIconDrawablePaddingPx()
+                    : mFolderName.getCompoundDrawablePadding();
+            return iconPadding + (int) Math.ceil(fm.bottom - fm.top);
         }
         return 0;
     }
@@ -438,7 +444,7 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
         prepareCreateAnimation(destView);
         getFolder().addFolderContent(destInfo);
 
-        if (!usesWorkspacePreviewLayout()) {
+        if (!isMultiSpanFolder()) {
             mPreviewItemManager.createFirstItemAnimation(false /* reverse */, null)
                     .start();
         }
@@ -489,7 +495,7 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
                 workspace.resetTransitionTransform();
             }
 
-            boolean usesWorkspacePreview = usesWorkspacePreviewLayout();
+            boolean usesWorkspacePreview = isMultiSpanFolder();
             PreviewDropAnimationTarget target = usesWorkspacePreview
                     ? prepareWorkspacePreviewDrop(item, index)
                     : prepareLegacyPreviewDrop(
@@ -776,7 +782,7 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
     @Nullable
     public View getPreviewItemLaunchSourceForAppClose(
             Predicate<ItemInfo> matcher) {
-        if (!usesWorkspacePreviewLayout() || !isLaidOut()
+        if (!isMultiSpanFolder() || !isLaidOut()
                 || mPreviewItemManager.getIntrinsicIconSize() <= 0) {
             return null;
         }
@@ -1091,9 +1097,11 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
                 .getIconCenterVertically();
         if (shouldCenterIcon || !shouldShowLabel) {
             int iconSize = mActivity.getDeviceProfile().getWorkspaceIconProfile().getIconSizePx();
+            int iconPadding = mActivity.getDeviceProfile().getWorkspaceIconProfile()
+                    .getIconDrawablePaddingPx();
             Paint.FontMetrics fm = mFolderName.getPaint().getFontMetrics();
             int textHeight = shouldShowLabel ? (int) Math.ceil(fm.bottom - fm.top) : 0;
-            int cellHeightPx = iconSize + mFolderName.getCompoundDrawablePadding() + textHeight;
+            int cellHeightPx = iconSize + iconPadding + textHeight;
             int availableHeight = MeasureSpec.getSize(heightMeasureSpec);
             if (isMultiSpanFolder()) {
                 int rowGap = mActivity.getDeviceProfile().getWorkspaceIconProfile()
@@ -1117,12 +1125,31 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
             int textWidth = mFolderName.getMeasuredWidth();
             int textHeight = mFolderName.getMeasuredHeight();
 
-            float density = mActivity.getDeviceProfile().getWorkspaceIconProfile().getIconSizePx() / 60.f;
-            int fallbackGap = Math.round(4f * density);
-            int gap = Math.max(mFolderName.getCompoundDrawablePadding(), fallbackGap);
-
             int textLeft = bgBounds.left + (bgBounds.width() - textWidth) / 2;
-            int textTop = bgBounds.bottom + gap;
+
+            int targetRow = getCurrentSpanY() - 1;
+            DeviceProfile dp = mActivity.getDeviceProfile();
+            int cellHeight = dp.getWorkspaceIconProfile().getCellHeightPx();
+            Point borderSpace = dp.getWorkspaceIconProfile().getCellLayoutBorderSpacePx();
+            int iconSize = dp.getWorkspaceIconProfile().getIconSizePx();
+            int iconPadding = dp.getWorkspaceIconProfile().getIconDrawablePaddingPx();
+
+            int cellPaddingY = getPaddingTop();
+            if (cellPaddingY <= 0) {
+                cellPaddingY = dp.getWorkspaceIconProfile().getCellYPaddingPx();
+            }
+            if (cellPaddingY <= 0) {
+                Paint.FontMetrics fm = mFolderName.getPaint().getFontMetrics();
+                int th = (int) Math.ceil(fm.bottom - fm.top);
+                cellPaddingY = Math.max(0, (cellHeight - (iconSize + iconPadding + th)) / 2);
+            }
+
+            int standardIconLabelTop = targetRow * (cellHeight + borderSpace.y)
+                    + cellPaddingY + iconSize + iconPadding;
+
+            int textTop = standardIconLabelTop;
+            int minTextTop = bgBounds.bottom + Math.max(1, iconPadding / 2);
+            textTop = Math.max(textTop, minTextTop);
 
             mFolderName.layout(textLeft, textTop, textLeft + textWidth, textTop + textHeight);
         }

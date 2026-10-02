@@ -54,6 +54,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.celllayout.DelegatedCellDrawing;
 import com.android.launcher3.graphics.ShapeDelegate;
 import com.android.launcher3.graphics.ThemeManager;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.views.ActivityContext;
 
 /**
@@ -92,6 +93,8 @@ public class PreviewBackground extends DelegatedCellDrawing {
     private View mInvalidateDelegate;
 
     int previewSize;
+    private int mSpanX = 1;
+    private int mSpanY = 1;
 
     private CellLayout mDrawingDelegate;
 
@@ -153,6 +156,7 @@ public class PreviewBackground extends DelegatedCellDrawing {
             int spanY,
             Rect outBounds) {
         int previewSize = grid.folderIconSizePx;
+        int iconSize = grid.getWorkspaceIconProfile().getIconSizePx();
 
         int cellWidth = grid.getWorkspaceIconProfile().getCellWidthPx();
         int cellHeight = grid.getWorkspaceIconProfile().getCellHeightPx();
@@ -171,19 +175,42 @@ public class PreviewBackground extends DelegatedCellDrawing {
 
         int backgroundWidth;
         int backgroundHeight;
+        int backgroundLeft;
+        int backgroundTop;
 
         if (spanX == 1 && spanY == 1) {
             backgroundWidth = previewSize;
             backgroundHeight = previewSize;
+            backgroundLeft = availableSpaceX > 0
+                    ? (availableSpaceX - backgroundWidth) / 2
+                    : (cellWidth - previewSize) / 2;
+            backgroundTop = topPadding + grid.folderIconOffsetYPx;
         } else {
+            // Multi-span enlarged folders (2x2, 2x1, 1x2, etc.)
+            // Flush-align outer bounds with standard workspace grid icon bounds:
+            // Top aligns with row 0 icon circle top (topPadding + folderIconOffsetYPx)
+            // Bottom aligns with row (spanY - 1) icon circle bottom
+            // Left aligns with col 0 icon circle left
+            // Right aligns with col (spanX - 1) icon circle right
+            if (topPadding <= 0) {
+                int cellPaddingY = grid.getWorkspaceIconProfile().getCellYPaddingPx();
+                if (cellPaddingY <= 0) {
+                    int iconTextHeight = Utilities.calculateTextHeight(
+                            grid.getWorkspaceIconProfile().getIconTextSizePx());
+                    int contentHeight = iconSize
+                            + grid.getWorkspaceIconProfile().getIconDrawablePaddingPx()
+                            + iconTextHeight;
+                    cellPaddingY = Math.max(0, (cellHeight - contentHeight) / 2);
+                }
+                topPadding = cellPaddingY;
+            }
             backgroundWidth = (spanX - 1) * (cellWidth + borderSpace.x) + previewSize;
             backgroundHeight = (spanY - 1) * (cellHeight + borderSpace.y) + previewSize;
+            backgroundLeft = availableSpaceX > 0
+                    ? (availableSpaceX - backgroundWidth) / 2
+                    : (cellWidth - previewSize) / 2;
+            backgroundTop = topPadding + grid.folderIconOffsetYPx;
         }
-
-        int backgroundLeft = availableSpaceX > 0
-                ? (availableSpaceX - backgroundWidth) / 2
-                : (cellWidth - previewSize) / 2;
-        int backgroundTop = topPadding + grid.folderIconOffsetYPx;
 
         outBounds.set(
             backgroundLeft,
@@ -220,6 +247,8 @@ public class PreviewBackground extends DelegatedCellDrawing {
     public void setup(Context context, ActivityContext activity, View invalidateDelegate,
             int availableSpaceX, int availableSpaceY, int topPadding, int spanX, int spanY) {
         mInvalidateDelegate = invalidateDelegate;
+        mSpanX = spanX;
+        mSpanY = spanY;
 
         TypedArray ta = context.getTheme().obtainStyledAttributes(R.styleable.FolderIconPreview);
         mStrokeColor = ta.getColor(R.styleable.FolderIconPreview_folderIconBorderColor, 0);
@@ -396,6 +425,24 @@ public class PreviewBackground extends DelegatedCellDrawing {
             float scale) {
         if (!(shape instanceof ShapeDelegate.RoundedSquare roundedSquare)) {
             return 0f;
+        }
+
+        if ((mSpanX == 2 && mSpanY == 1) || (mSpanX == 1 && mSpanY == 2)) {
+            // 2x1 horizontal and 1x2 vertical capsules: rounded end caps (stadium / pill shape) matching OOS
+            return Math.min(bounds.width(), bounds.height()) / 2f * scale;
+        }
+
+        if (mSpanX > 1 || mSpanY > 1) {
+            // Multi-span enlarged folders (e.g. 2x2, 1x2):
+            // Always keep boxy borders with smooth rounded corners matching OOS,
+            // even when the workspace icon shape is circular.
+            float boxyRadius = previewSize * 0.44f * scale;
+            if (shape instanceof ShapeDelegate.RoundedSquare
+                    && !(shape instanceof ShapeDelegate.Circle)) {
+                boxyRadius = Math.max(boxyRadius,
+                        previewSize / 2f * roundedSquare.getRadiusRatio() * scale);
+            }
+            return Math.min(boxyRadius, Math.min(bounds.width(), bounds.height()) / 2f);
         }
 
         if (shape instanceof ShapeDelegate.Circle) {

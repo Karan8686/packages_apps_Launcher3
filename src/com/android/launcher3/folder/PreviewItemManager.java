@@ -33,6 +33,7 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Point;
 import android.graphics.PointF;
@@ -46,6 +47,7 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
+import androidx.core.graphics.ColorUtils;
 
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
@@ -260,13 +262,13 @@ public class PreviewItemManager {
 
             return FolderPreviewLayout.calculateGrid(availableBounds, itemSize, minGap);
         } else if (spanX == 2 && spanY == 1) {
-            // 2x1 horizontal capsule folder: 3 items across (matching OSS)
+            // 2x1 horizontal capsule folder: 3 items across (matching OOS)
             int columns = 3;
             int rows = 1;
             float H = backgroundBounds.height();
             float W = backgroundBounds.width();
 
-            float itemSize = Math.min(H * 0.74f, (W - 4 * (H * 0.08f)) / 3f);
+            float itemSize = Math.min(H * 0.70f, (W - 4 * (H * 0.08f)) / 3f);
             float idealPaddingY = (H - itemSize) / 2f;
             float totalItemsWidth = columns * itemSize;
             float columnGap = (W - totalItemsWidth) / (columns + 1);
@@ -282,26 +284,48 @@ public class PreviewItemManager {
                     columnGap,
                     0f
             );
+        } else if (spanX == 1 && spanY == 2) {
+            // 1x2 vertical capsule folder: 3 items down (matching OOS)
+            int columns = 1;
+            int rows = 3;
+            float H = backgroundBounds.height();
+            float W = backgroundBounds.width();
+
+            float itemSize = Math.min(W * 0.70f, (H - 4 * (W * 0.08f)) / 3f);
+            float idealPaddingX = (W - itemSize) / 2f;
+            float totalItemsHeight = rows * itemSize;
+            float rowGap = (H - totalItemsHeight) / (rows + 1);
+            float startX = backgroundBounds.left + idealPaddingX;
+            float startY = backgroundBounds.top + rowGap;
+
+            return new FolderPreviewLayout.Grid(
+                    columns,
+                    rows,
+                    startX,
+                    startY,
+                    itemSize,
+                    0f,
+                    rowGap
+            );
         } else {
-            // Multi-row folders (e.g. 2x2, 1x2)
-            int columns = spanX;
-            int rows = spanY;
+            // Multi-span enlarged folders (2x2)
+            // Matching OxygenOS / ColorOS styling:
+            // Icons have equal padding from all outer borders and identical inner gap.
+            int columns = 2;
+            int rows = 2;
+            float W = backgroundBounds.width();
+            float H = backgroundBounds.height();
 
-            int cellWidth = deviceProfile.getWorkspaceIconProfile().getCellWidthPx();
-            int cellHeight = deviceProfile.getWorkspaceIconProfile().getCellHeightPx();
-            Point borderSpace = deviceProfile.getWorkspaceIconProfile().getCellLayoutBorderSpacePx();
+            float targetGap = Math.min(W, H) * 0.082f;
+            float itemSize = Math.min((W - 3 * targetGap) / 2f, (H - 3 * targetGap) / 2f);
 
-            float stepX = cellWidth + borderSpace.x;
-            float stepY = cellHeight + borderSpace.y;
+            float totalGridWidth = columns * itemSize;
+            float totalGridHeight = rows * itemSize;
+            float columnGap = (W - totalGridWidth) / (columns + 1);
+            float rowGap = (H - totalGridHeight) / (rows + 1);
 
-            float previewSize = deviceProfile.folderIconSizePx;
-            float itemSize = previewSize * 0.82f;
-
-            float startX = backgroundBounds.left + (previewSize - itemSize) / 2f;
-            float startY = backgroundBounds.top + (previewSize - itemSize) / 2f;
-
-            float columnGap = columns > 1 ? stepX - itemSize : 0f;
-            float rowGap = rows > 1 ? stepY - itemSize : 0f;
+            float startX = backgroundBounds.left + columnGap;
+            float startY = backgroundBounds.top + rowGap;
 
             return new FolderPreviewLayout.Grid(
                     columns,
@@ -410,7 +434,7 @@ public class PreviewItemManager {
 
     @Nullable
     FolderPreviewLayout.ItemPlacement findDirectItemAt(float x, float y) {
-        if (!mIcon.usesWorkspacePreviewLayout() || mIntrinsicIconSize <= 0) {
+        if (!mIcon.isMultiSpanFolder() || mIntrinsicIconSize <= 0) {
             return null;
         }
 
@@ -525,6 +549,24 @@ public class PreviewItemManager {
                         || Math.abs(firstPageItemsTransX) > mClipThreshold
                         || mIcon.usesWorkspacePreviewLayout())
                 && !mIcon.isMultiSpanFolder();
+        if (mIcon.isMultiSpanFolder() && mIntrinsicIconSize > 0) {
+            FolderPreviewLayout.Snapshot snapshot = calculateWorkspacePreviewSnapshot();
+            if (snapshot != null && snapshot.getPlaceholderBounds() != null
+                    && !snapshot.getPlaceholderBounds().isEmpty()) {
+                Paint dotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                dotPaint.setStyle(Paint.Style.FILL);
+                int bgColor = bg.getBgColor();
+                boolean isDark = ColorUtils.calculateLuminance(bgColor) < 0.5;
+                dotPaint.setColor(isDark ? 0x30FFFFFF : 0x24000000);
+
+                for (RectF dot : snapshot.getPlaceholderBounds()) {
+                    float cx = dot.centerX() + firstPageItemsTransX;
+                    float cy = dot.centerY();
+                    canvas.drawCircle(cx, cy, (dot.width() / 2f) * 0.9f, dotPaint);
+                }
+            }
+        }
+
         drawParams(
                 canvas,
                 mFirstPageParams,
@@ -572,7 +614,7 @@ public class PreviewItemManager {
         // If there are more params than visible in the preview, they are used for enter/exit
         // animation purposes and they were added to the front of the list.
         // To index the params properly, we need to skip these params.
-        if (!mIcon.usesWorkspacePreviewLayout()) {
+        if (!mIcon.isMultiSpanFolder()) {
             paramIndex += Math.max(
                 mFirstPageParams.size() - MAX_NUM_ITEMS_IN_PREVIEW,
                 0);
@@ -786,7 +828,7 @@ public class PreviewItemManager {
     }
 
     void buildParamsForPage(int page, ArrayList<PreviewItemDrawingParams> params, boolean animate) {
-        if (mIcon.usesWorkspacePreviewLayout() && mIntrinsicIconSize > 0) {
+        if (mIcon.isMultiSpanFolder() && mIntrinsicIconSize > 0) {
             FolderPreviewLayout.Snapshot snapshot = page == 0
                     ? calculateWorkspacePreviewSnapshot()
                     : calculateWorkspacePreviewSnapshotForPage(page);
@@ -914,7 +956,7 @@ public class PreviewItemManager {
         final ArrayList<PreviewItemDrawingParams> params = mFirstPageParams;
         buildParamsForPage(0, params, false);
 
-        if (mIcon.usesWorkspacePreviewLayout()) {
+        if (mIcon.isMultiSpanFolder()) {
             onParamsChanged();
             return;
         }
