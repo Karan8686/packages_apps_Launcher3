@@ -98,22 +98,25 @@ data class WorkspaceProfile(
         context: Context,
         inv: InvariantDeviceProfile,
     ): WorkspaceProfile {
-        if (inv.devicePaddingId != ResourceUtils.INVALID_RESOURCE_HANDLE) {
-            // Paddings were created assuming no scaling, so we first unscale the extra space.
-            val unscaledExtraSpace: Int = (extraSpace / cellScaleToFit).toInt()
-            val devicePaddings = DevicePaddings(context, inv.devicePaddingId)
-            val padding = devicePaddings.getDevicePadding(unscaledExtraSpace)
-            return copy(
-                maxEmptySpace = padding.maxEmptySpacePx,
-                workspaceTopPadding =
-                    Math.round(padding.getWorkspaceTopPadding(unscaledExtraSpace) * cellScaleToFit),
-                workspaceBottomPadding =
-                    Math.round(
-                        padding.getWorkspaceBottomPadding(unscaledExtraSpace) * cellScaleToFit
-                    ),
-            )
-        }
-        return this
+        val paddingResId =
+            if (inv.devicePaddingId != ResourceUtils.INVALID_RESOURCE_HANDLE) {
+                inv.devicePaddingId
+            } else {
+                R.xml.paddings_handhelds
+            }
+        // Paddings were created assuming no scaling, so we first unscale the extra space.
+        val unscaledExtraSpace: Int = (extraSpace / cellScaleToFit).toInt()
+        val devicePaddings = DevicePaddings(context, paddingResId)
+        val padding = devicePaddings.getDevicePadding(unscaledExtraSpace)
+        return copy(
+            maxEmptySpace = padding.maxEmptySpacePx,
+            workspaceTopPadding =
+                Math.round(padding.getWorkspaceTopPadding(unscaledExtraSpace) * cellScaleToFit),
+            workspaceBottomPadding =
+                Math.round(
+                    padding.getWorkspaceBottomPadding(unscaledExtraSpace) * cellScaleToFit
+                ),
+        )
     }
 
     // TODO(b/430382569)
@@ -160,12 +163,12 @@ data class WorkspaceProfile(
                 deviceProperties.isTwoPanels -> cellLayoutBorderSpacePx.x / 2
                 else -> res.getDimensionPixelSize(R.dimen.cell_layout_padding)
             }
-        val (workspacePadding, cellLayoutPaddingPx) =
+        var (workspacePadding, cellLayoutPaddingPx) =
             insetPadding(
                 noInsetWorkspacePadding,
                 Rect(cellLayoutPadding, cellLayoutPadding, cellLayoutPadding, cellLayoutPadding),
             )
-        val cellSize =
+        var cellSize =
             calculateCellSize(
                 cellLayoutBorderSpacePx = this.cellLayoutBorderSpacePx,
                 panelCount = this.panelCount,
@@ -179,10 +182,66 @@ data class WorkspaceProfile(
                         workspacePadding.top + workspacePadding.bottom,
                     ),
             )
+
+        // Compact vertical row spacing on portrait workspace so icons sit closer vertically
+        // and 2x2 folders/Super Icons are closer to a square aspect ratio across all grid styles.
+        if (!isVerticalLayout && !deviceProperties.isTwoPanels && inv.numRows > 1) {
+            val contentHeight =
+                iconSizePx +
+                    iconDrawablePaddingPx +
+                    com.android.launcher3.Utilities.calculateTextHeight(iconTextSizePx.toFloat())
+            val idealRowStride = cellSize.x + cellLayoutBorderSpacePx.x
+            val targetCellHeight =
+                max(
+                    contentHeight,
+                    min(cellSize.y, idealRowStride - cellLayoutBorderSpacePx.y + (iconDrawablePaddingPx / 2))
+                )
+            if (cellSize.y > targetCellHeight) {
+                val excessHeight = (cellSize.y - targetCellHeight) * inv.numRows
+                val extraTop = Math.round(excessHeight * 0.45f)
+                val extraBottom = excessHeight - extraTop
+                workspacePadding =
+                    Rect(
+                        workspacePadding.left,
+                        workspacePadding.top + extraTop,
+                        workspacePadding.right,
+                        workspacePadding.bottom + extraBottom,
+                    )
+                cellSize =
+                    calculateCellSize(
+                        cellLayoutBorderSpacePx = this.cellLayoutBorderSpacePx,
+                        panelCount = this.panelCount,
+                        deviceProperties = deviceProperties,
+                        numColumns = inv.numColumns,
+                        numRows = inv.numRows,
+                        cellLayoutPadding = cellLayoutPaddingPx,
+                        totalWorkspacePadding =
+                            Point(
+                                workspacePadding.left + workspacePadding.right,
+                                workspacePadding.top + workspacePadding.bottom,
+                            ),
+                    )
+            }
+        }
+
+        val finalContentHeight =
+            iconSizePx +
+                iconDrawablePaddingPx +
+                com.android.launcher3.Utilities.calculateTextHeight(iconTextSizePx.toFloat())
+        val updatedCellYPaddingPx =
+            if (cellYPaddingPx >= 0) {
+                max(0, (cellSize.y - finalContentHeight) / 2)
+            } else {
+                cellYPaddingPx
+            }
+
         return copy(
             workspacePadding = workspacePadding,
             cellLayoutPaddingPx = cellLayoutPaddingPx,
             cellSize = cellSize,
+            cellWidthPx = if (cellSize.x > 0) cellSize.x else cellWidthPx,
+            cellHeightPx = if (cellSize.y > 0) cellSize.y else cellHeightPx,
+            cellYPaddingPx = updatedCellYPaddingPx,
         )
     }
 

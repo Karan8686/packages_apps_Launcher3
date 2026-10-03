@@ -158,20 +158,17 @@ public class PreviewBackground extends DelegatedCellDrawing {
         int previewSize = grid.folderIconSizePx;
         int iconSize = grid.getWorkspaceIconProfile().getIconSizePx();
 
-        int cellWidth = grid.getWorkspaceIconProfile().getCellWidthPx();
-        int cellHeight = grid.getWorkspaceIconProfile().getCellHeightPx();
         Point borderSpace = grid.getWorkspaceIconProfile().getCellLayoutBorderSpacePx();
+        Point cellSize = grid.getWorkspaceIconProfile().getCellSize();
 
-        if (cellWidth <= 0 && availableSpaceX > 0) {
-            cellWidth = spanX > 1
-                    ? (availableSpaceX - (spanX - 1) * borderSpace.x) / spanX
-                    : availableSpaceX;
-        }
-        if (cellHeight <= 0 && availableSpaceY > 0) {
-            cellHeight = spanY > 1
-                    ? (availableSpaceY - (spanY - 1) * borderSpace.y) / spanY
-                    : availableSpaceY;
-        }
+        int cellWidth = availableSpaceX > 0
+                ? (spanX > 1 ? (availableSpaceX - (spanX - 1) * borderSpace.x) / spanX
+                        : availableSpaceX)
+                : (cellSize.x > 0 ? cellSize.x : grid.getWorkspaceIconProfile().getCellWidthPx());
+        int cellHeight = availableSpaceY > 0
+                ? (spanY > 1 ? (availableSpaceY - (spanY - 1) * borderSpace.y) / spanY
+                        : availableSpaceY)
+                : (cellSize.y > 0 ? cellSize.y : grid.getWorkspaceIconProfile().getCellHeightPx());
 
         int backgroundWidth;
         int backgroundHeight;
@@ -205,17 +202,7 @@ public class PreviewBackground extends DelegatedCellDrawing {
                 topPadding = cellPaddingY;
             }
             backgroundWidth = (spanX - 1) * (cellWidth + borderSpace.x) + previewSize;
-
-            // For vertical span (spanY > 1), the background must extend below the icon
-            // circle in the last row to cover the label text area. Without this, the
-            // card is clipped short at the bottom.
-            int iconTextHeight = Utilities.calculateTextHeight(
-                    grid.getWorkspaceIconProfile().getIconTextSizePx());
-            int labelSpace = grid.getWorkspaceIconProfile().getIconDrawablePaddingPx()
-                    + iconTextHeight;
-            int verticalExtra = spanY > 1 ? labelSpace : 0;
-            backgroundHeight = (spanY - 1) * (cellHeight + borderSpace.y)
-                    + previewSize + verticalExtra;
+            backgroundHeight = (spanY - 1) * (cellHeight + borderSpace.y) + previewSize;
             backgroundLeft = availableSpaceX > 0
                     ? (availableSpaceX - backgroundWidth) / 2
                     : (cellWidth - previewSize) / 2;

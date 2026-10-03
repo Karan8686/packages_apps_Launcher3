@@ -956,11 +956,29 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
         int iconSize = mDeviceProfile.getWorkspaceIconProfile().getIconSizePx();
         int previewSize = mDeviceProfile.folderIconSizePx;
-        int cellWidth = mDeviceProfile.getWorkspaceIconProfile().getCellWidthPx();
-        int cellHeight = mDeviceProfile.getWorkspaceIconProfile().getCellHeightPx();
         Point borderSpace = mDeviceProfile.getWorkspaceIconProfile().getCellLayoutBorderSpacePx();
+        Point cellSize = mDeviceProfile.getWorkspaceIconProfile().getCellSize();
 
-        int cellPaddingY = mDeviceProfile.getWorkspaceIconProfile().getCellYPaddingPx();
+        int availableSpaceX = getWidth() > 0 ? getWidth()
+                : (getMeasuredWidth() > 0 ? getMeasuredWidth() : 0);
+        int availableSpaceY = getHeight() > 0 ? getHeight()
+                : (getMeasuredHeight() > 0 ? getMeasuredHeight() : 0);
+
+        int cellWidth = availableSpaceX > 0
+                ? (spanX > 1 ? (availableSpaceX - (spanX - 1) * borderSpace.x) / spanX
+                        : availableSpaceX)
+                : (cellSize.x > 0 ? cellSize.x
+                        : mDeviceProfile.getWorkspaceIconProfile().getCellWidthPx());
+        int cellHeight = availableSpaceY > 0
+                ? (spanY > 1 ? (availableSpaceY - (spanY - 1) * borderSpace.y) / spanY
+                        : availableSpaceY)
+                : (cellSize.y > 0 ? cellSize.y
+                        : mDeviceProfile.getWorkspaceIconProfile().getCellHeightPx());
+
+        int cellPaddingY = getPaddingTop();
+        if (cellPaddingY <= 0) {
+            cellPaddingY = mDeviceProfile.getWorkspaceIconProfile().getCellYPaddingPx();
+        }
         if (cellPaddingY <= 0) {
             int iconTextHeight = Utilities.calculateTextHeight(
                     mDeviceProfile.getWorkspaceIconProfile().getIconTextSizePx());
@@ -971,15 +989,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
 
         int bgWidth = (spanX - 1) * (cellWidth + borderSpace.x) + previewSize;
-
-        // Extend height to include the label area below the icon circle in the last row
-        int iconTextHeight = Utilities.calculateTextHeight(
-                mDeviceProfile.getWorkspaceIconProfile().getIconTextSizePx());
-        int labelSpace = mDeviceProfile.getWorkspaceIconProfile().getIconDrawablePaddingPx()
-                + iconTextHeight;
-        int verticalExtra = spanY > 1 ? labelSpace : 0;
-        int bgHeight = (spanY - 1) * (cellHeight + borderSpace.y) + previewSize + verticalExtra;
-        int bgLeft = (getWidth() - bgWidth) / 2;
+        int bgHeight = (spanY - 1) * (cellHeight + borderSpace.y) + previewSize;
+        int bgLeft = availableSpaceX > 0
+                ? (availableSpaceX - bgWidth) / 2
+                : (cellWidth - previewSize) / 2;
         int bgTop = cellPaddingY + mDeviceProfile.folderIconOffsetYPx;
 
         outBounds.set(bgLeft, bgTop, bgLeft + bgWidth, bgTop + bgHeight);

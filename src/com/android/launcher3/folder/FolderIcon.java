@@ -1127,10 +1127,17 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
 
             int textLeft = bgBounds.left + (bgBounds.width() - textWidth) / 2;
 
-            int targetRow = getCurrentSpanY() - 1;
+            int spanY = getCurrentSpanY();
+            int targetRow = spanY - 1;
             DeviceProfile dp = mActivity.getDeviceProfile();
-            int cellHeight = dp.getWorkspaceIconProfile().getCellHeightPx();
             Point borderSpace = dp.getWorkspaceIconProfile().getCellLayoutBorderSpacePx();
+            Point cellSize = dp.getWorkspaceIconProfile().getCellSize();
+            int availableHeight = getHeight() > 0 ? getHeight() : getMeasuredHeight();
+            int cellHeight = availableHeight > 0
+                    ? (spanY > 1 ? (availableHeight - (spanY - 1) * borderSpace.y) / spanY
+                            : availableHeight)
+                    : (cellSize.y > 0 ? cellSize.y
+                            : dp.getWorkspaceIconProfile().getCellHeightPx());
             int iconSize = dp.getWorkspaceIconProfile().getIconSizePx();
             int iconPadding = dp.getWorkspaceIconProfile().getIconDrawablePaddingPx();
 
