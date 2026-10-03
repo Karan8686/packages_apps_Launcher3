@@ -36,6 +36,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.app.animation.Interpolators;
+import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.model.data.ItemInfo;
@@ -169,6 +170,15 @@ public class LauncherSwipeHandlerV2 extends AbsSwipeUpHandler<
                     mTargetRect = new RectF(iconLocation);
                 }
                 return mTargetRect;
+            }
+
+            @Override
+            public float getEndRadius(RectF cropRectF) {
+                if (workspaceView instanceof BubbleTextView btv && btv.isMultiSpan()) {
+                    float targetWidth = Math.max(1f, iconLocation.width());
+                    return btv.getIconBackgroundCornerRadius() * (cropRectF.width() / targetWidth);
+                }
+                return super.getEndRadius(cropRectF);
             }
 
             @Override

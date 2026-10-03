@@ -915,9 +915,20 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     protected void drawWithoutDot(Canvas canvas) {
         if (isMultiSpan()) {
             drawMultiSpanSuperIcon(canvas);
+            drawMultiSpanLabel(canvas);
             return;
         }
         super.onDraw(canvas);
+    }
+
+    @Nullable
+    public AdaptiveIconDrawable getSuperIconAdaptiveDrawable() {
+        return mSuperIconAdaptiveDrawable;
+    }
+
+    @Nullable
+    public Drawable getSuperIconBadge() {
+        return mSuperIconBadge;
     }
 
     public boolean isMultiSpan() {
@@ -1082,7 +1093,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         });
     }
 
-    private void drawMultiSpanSuperIcon(Canvas canvas) {
+    protected void drawMultiSpanSuperIcon(Canvas canvas) {
+        if (!mIsIconVisible) {
+            return;
+        }
         Rect bgBounds = getMultiSpanBackgroundBounds();
         RectF bgRectF = new RectF(bgBounds);
         float radius = getIconBackgroundCornerRadius();
@@ -1180,10 +1194,28 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         canvas.restore();
     }
 
+    protected void drawMultiSpanLabel(Canvas canvas) {
+        if (!shouldTextBeVisible() || TextUtils.isEmpty(getText()) || getLayout() == null) {
+            return;
+        }
+        Rect bgBounds = getMultiSpanBackgroundBounds();
+        int textTop = bgBounds.bottom + getCompoundDrawablePadding();
+        int textWidth = getLayout().getWidth();
+        int textLeft = bgBounds.left + (bgBounds.width() - textWidth) / 2;
+
+        canvas.save();
+        canvas.translate(getScrollX() + textLeft, getScrollY() + textTop);
+        getPaint().setColor(getCurrentTextColor());
+        getPaint().drawableState = getDrawableState();
+        getLayout().draw(canvas);
+        canvas.restore();
+    }
+
     @Override
     public void onDraw(Canvas canvas) {
         if (isMultiSpan()) {
             drawMultiSpanSuperIcon(canvas);
+            drawMultiSpanLabel(canvas);
             drawDotIfNecessary(canvas);
             return;
         }
@@ -1440,13 +1472,18 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             // Keep custom icons independent of the global icon padding as well as its size.
             setPadding(0, getPaddingTop(), 0, 0);
         }
+        int availableHeight = height;
+        if (isMultiSpan() && getSpanY() > 1) {
+            int rowGap = mDeviceProfile.getWorkspaceIconProfile().getCellLayoutBorderSpacePx().y;
+            availableHeight = (height - (getSpanY() - 1) * rowGap) / getSpanY();
+        }
         if ((customSize || mCenterVertically || !shouldShowLabel()) && !mLayoutHorizontal) {
             Paint.FontMetrics fm = getPaint().getFontMetrics();
             int textHeight = shouldShowLabel()
                     ? (int) Math.ceil(fm.bottom - fm.top) * getCellSpecMaxTextLineCount() : 0;
             int cellHeightPx = mIconSize + getCompoundDrawablePadding() + textHeight;
-            setPadding(getPaddingLeft(), (height - cellHeightPx) / 2, getPaddingRight(),
-                    getPaddingBottom());
+            setPadding(getPaddingLeft(), Math.max(0, (availableHeight - cellHeightPx) / 2),
+                    getPaddingRight(), getPaddingBottom());
         }
         if (shouldDrawAppContrastTile()) {
             int mAppTitleHorizontalPadding = getResources().getDimensionPixelSize(
@@ -1460,7 +1497,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
 
         if (shouldUseTwoLine() && (mLastOriginalText != null)) {
-            int allowedVerticalSpace = height - getPaddingTop() - getPaddingBottom()
+            int allowedVerticalSpace = availableHeight - getPaddingTop() - getPaddingBottom()
                     - (mIcon != null ? mIconSize + getCompoundDrawablePadding() : 0);
             CharSequence modifiedString = modifyTitleToSupportMultiLine(
                     MeasureSpec.getSize(widthMeasureSpec) - getCompoundPaddingLeft()
@@ -1793,6 +1830,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
         Drawable icon = getIconOrTransparentColor();
         applyCompoundDrawables(icon);
+        if (isMultiSpan()) {
+            invalidate();
+        }
     }
 
     private Drawable getIconOrTransparentColor() {
