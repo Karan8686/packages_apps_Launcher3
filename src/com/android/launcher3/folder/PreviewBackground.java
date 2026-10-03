@@ -202,7 +202,8 @@ public class PreviewBackground extends DelegatedCellDrawing {
                 }
                 topPadding = cellPaddingY;
             }
-            backgroundHeight = (spanY - 1) * (cellHeight + borderSpace.y) + previewSize;
+            int naturalSpanHeight = (spanY - 1) * (cellHeight + borderSpace.y) + previewSize;
+            backgroundHeight = naturalSpanHeight;
             backgroundTop = topPadding + grid.folderIconOffsetYPx;
 
             if (spanX == 1) {
@@ -218,6 +219,8 @@ public class PreviewBackground extends DelegatedCellDrawing {
                     int bgPaddingHoriz = Math.min(oosBgPaddingHoriz, iconAlignedPaddingHoriz);
                     int matchingSpanWidth = 2 * cellWidth + borderSpace.x - 2 * bgPaddingHoriz;
                     backgroundHeight = matchingSpanWidth;
+                    int extraY = Math.max(0, naturalSpanHeight - backgroundHeight);
+                    backgroundTop += extraY / 2;
                 }
             } else {
                 int numColumns = grid.inv != null ? grid.inv.numColumns : 4;
@@ -232,6 +235,8 @@ public class PreviewBackground extends DelegatedCellDrawing {
                 backgroundWidth = Math.max(previewSize, totalSpanWidth - 2 * bgPaddingHoriz);
                 if (spanX == 2 && spanY == 2) {
                     backgroundHeight = backgroundWidth;
+                    int extraY = Math.max(0, naturalSpanHeight - backgroundHeight);
+                    backgroundTop += extraY / 2;
                 }
             }
         }
