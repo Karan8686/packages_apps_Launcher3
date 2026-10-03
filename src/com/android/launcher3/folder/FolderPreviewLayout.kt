@@ -31,7 +31,7 @@ object FolderPreviewLayout {
 
     data class ItemPlacement(val item: ItemInfo, val role: ItemRole, val bounds: RectF)
 
-    data class Grid(
+    data class Grid @JvmOverloads constructor(
         val columns: Int,
         val rows: Int,
         val startX: Float,
@@ -39,9 +39,10 @@ object FolderPreviewLayout {
         val itemSize: Float,
         val columnGap: Float,
         val rowGap: Float,
+        val featuredFirstItem: Boolean = false,
     ) {
         val capacity: Int
-            get() = columns * rows
+            get() = if (featuredFirstItem && columns == 3 && rows == 3) 6 else columns * rows
     }
 
     data class GridUsage(val hasEmptyColumns: Boolean, val hasEmptyRows: Boolean)
@@ -185,11 +186,38 @@ object FolderPreviewLayout {
     fun calculateGridItemBounds(index: Int, grid: Grid, isRtl: Boolean): RectF {
         require(index in 0 until grid.capacity)
 
+        val stepX = grid.itemSize + grid.columnGap
+        val stepY = grid.itemSize + grid.rowGap
+
+        if (grid.featuredFirstItem && grid.columns == 3 && grid.rows == 3) {
+            if (index == 0) {
+                val spanWidth = 2f * grid.itemSize + grid.columnGap
+                val spanHeight = 2f * grid.itemSize + grid.rowGap
+                val featuredSize = minOf(spanWidth, spanHeight)
+                val blockLeft = if (isRtl) grid.startX + stepX else grid.startX
+                val blockTop = grid.startY
+                val left = blockLeft + (spanWidth - featuredSize) / 2f
+                val top = blockTop + (spanHeight - featuredSize) / 2f
+                return squareBounds(left, top, featuredSize)
+            }
+            val (row, logicalColumn) = when (index) {
+                1 -> 0 to 2
+                2 -> 1 to 2
+                3 -> 2 to 0
+                4 -> 2 to 1
+                else -> 2 to 2
+            }
+            val column = if (isRtl) grid.columns - logicalColumn - 1 else logicalColumn
+            return squareBounds(
+                grid.startX + column * stepX,
+                grid.startY + row * stepY,
+                grid.itemSize,
+            )
+        }
+
         val row = index / grid.columns
         val logicalColumn = index % grid.columns
         val column = if (isRtl) grid.columns - logicalColumn - 1 else logicalColumn
-        val stepX = grid.itemSize + grid.columnGap
-        val stepY = grid.itemSize + grid.rowGap
 
         return squareBounds(grid.startX + column * stepX, grid.startY + row * stepY, grid.itemSize)
     }
@@ -199,6 +227,7 @@ object FolderPreviewLayout {
         if ((grid.columns in 2..3 && grid.rows == 1)
             || (grid.columns == 1 && grid.rows in 2..3)
             || (grid.columns == 2 && grid.rows == 2)
+            || (grid.columns == 3 && grid.rows == 3)
         ) {
             return itemCount >= 2
         }
@@ -211,6 +240,7 @@ object FolderPreviewLayout {
         if ((grid.columns in 2..3 && grid.rows == 1)
             || (grid.columns == 1 && grid.rows in 2..3)
             || (grid.columns == 2 && grid.rows == 2)
+            || (grid.columns == 3 && grid.rows == 3)
         ) {
             if (itemCount >= 2) {
                 return GridUsage(

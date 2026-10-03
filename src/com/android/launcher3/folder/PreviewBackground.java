@@ -147,7 +147,7 @@ public class PreviewBackground extends DelegatedCellDrawing {
                 }
             };
 
-    static void calculateBackgroundBounds(
+    public static void calculateBackgroundBounds(
             DeviceProfile grid,
             int availableSpaceX,
             int availableSpaceY,
@@ -183,12 +183,10 @@ public class PreviewBackground extends DelegatedCellDrawing {
                     : (cellWidth - previewSize) / 2;
             backgroundTop = topPadding + grid.folderIconOffsetYPx;
         } else {
-            // Multi-span enlarged folders (2x2, 2x1, 1x2, etc.)
-            // Flush-align outer bounds with standard workspace grid icon bounds:
-            // Top aligns with row 0 icon circle top (topPadding + folderIconOffsetYPx)
-            // Bottom aligns with row (spanY - 1) icon circle bottom
-            // Left aligns with col 0 icon circle left
-            // Right aligns with col (spanX - 1) icon circle right
+            // Multi-span enlarged folders and Super Icons (2x2, 2x1, 1x2, etc.)
+            // Match OOS SizeSpacingConfig + OplusPreviewBackground:
+            // Top aligns with row 0 icon top (topPadding + folderIconOffsetYPx)
+            // Bottom aligns with row (spanY - 1) icon bottom
             if (topPadding <= 0) {
                 int cellPaddingY = grid.getWorkspaceIconProfile().getCellYPaddingPx();
                 if (cellPaddingY <= 0) {
@@ -197,16 +195,33 @@ public class PreviewBackground extends DelegatedCellDrawing {
                     int contentHeight = iconSize
                             + grid.getWorkspaceIconProfile().getIconDrawablePaddingPx()
                             + iconTextHeight;
-                    cellPaddingY = Math.max(0, (cellHeight - contentHeight) / 2);
+                    float yFactor = (grid.getDeviceProperties().isTablet()
+                            || grid.getDeviceProperties().isTwoPanels()
+                            || grid.isVerticalBarLayout()) ? 0.5f : 0.6666667f;
+                    cellPaddingY = Math.round(Math.max(0, cellHeight - contentHeight) * yFactor);
                 }
                 topPadding = cellPaddingY;
             }
-            backgroundWidth = (spanX - 1) * (cellWidth + borderSpace.x) + previewSize;
             backgroundHeight = (spanY - 1) * (cellHeight + borderSpace.y) + previewSize;
-            backgroundLeft = availableSpaceX > 0
-                    ? (availableSpaceX - backgroundWidth) / 2
-                    : (cellWidth - previewSize) / 2;
             backgroundTop = topPadding + grid.folderIconOffsetYPx;
+
+            if (spanX == 1) {
+                backgroundWidth = previewSize;
+                backgroundLeft = availableSpaceX > 0
+                        ? (availableSpaceX - backgroundWidth) / 2
+                        : (cellWidth - previewSize) / 2;
+            } else {
+                int numColumns = grid.inv != null ? grid.inv.numColumns : 4;
+                float bgPaddingHorizDp = numColumns <= 3 ? 18f : (numColumns == 4 ? 10f : 4.7f);
+                int oosBgPaddingHoriz = Utilities.dpToPx(bgPaddingHorizDp);
+                int iconAlignedPaddingHoriz = Math.max(0, (cellWidth - previewSize) / 2);
+                int bgPaddingHoriz = Math.min(oosBgPaddingHoriz, iconAlignedPaddingHoriz);
+                int totalSpanWidth = availableSpaceX > 0
+                        ? availableSpaceX
+                        : (spanX * cellWidth + (spanX - 1) * borderSpace.x);
+                backgroundLeft = bgPaddingHoriz;
+                backgroundWidth = Math.max(previewSize, totalSpanWidth - 2 * bgPaddingHoriz);
+            }
         }
 
         outBounds.set(

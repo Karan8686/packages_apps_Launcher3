@@ -58,6 +58,7 @@ import com.android.launcher3.apppairs.AppPairIcon;
 import com.android.launcher3.apppairs.AppPairIconDrawingParams;
 import com.android.launcher3.apppairs.AppPairIconGraphic;
 import com.android.launcher3.model.data.AppPairInfo;
+import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
@@ -309,23 +310,38 @@ public class PreviewItemManager {
             );
         } else {
             // Multi-span enlarged folders (2x2)
-            // Matching OxygenOS / ColorOS styling:
-            // Icons have equal padding from all outer borders and identical inner gap.
-            int columns = 2;
-            int rows = 2;
+            // Matching OxygenOS / ColorOS (SizeSpacingConfig + OplusClippedFolderIconLayoutRule):
+            // Supports 3 inner icon styles persisted in FolderInfo:
+            // - FOLDER_STYLE_2X2 (0): 2x2 grid (3 direct + 1 overview)
+            // - FOLDER_STYLE_3X3 (1): 3x3 grid (8 direct + 1 overview)
+            // - FOLDER_STYLE_FEATURED (2): 3x3 base grid with top-left 2x2 featured icon (1 large + 4 direct + 1 overview)
+            int style = mIcon.mInfo != null
+                    ? mIcon.mInfo.getBigFolderStyle()
+                    : FolderInfo.FOLDER_STYLE_2X2;
+            boolean isThreeByThreeBase = (style == FolderInfo.FOLDER_STYLE_3X3
+                    || style == FolderInfo.FOLDER_STYLE_FEATURED);
+            boolean featuredFirstItem = (style == FolderInfo.FOLDER_STYLE_FEATURED);
+            int columns = isThreeByThreeBase ? 3 : 2;
+            int rows = isThreeByThreeBase ? 3 : 2;
             float W = backgroundBounds.width();
             float H = backgroundBounds.height();
 
-            float targetGap = Math.min(W, H) * 0.082f;
-            float itemSize = Math.min((W - 3 * targetGap) / 2f, (H - 3 * targetGap) / 2f);
+            int numColumns = deviceProfile.inv != null ? deviceProfile.inv.numColumns : 4;
+            float padding = resources.getDimension(numColumns >= 5
+                    ? R.dimen.big_folder_preview_padding_5col
+                    : R.dimen.big_folder_preview_padding_4col);
+            float subCellW = (W - 2f * padding) / columns;
+            float subCellH = (H - 2f * padding) / rows;
+            float itemScale = isThreeByThreeBase ? 0.82f : 0.80f;
+            float itemSize = Math.min(subCellW, subCellH) * itemScale;
 
-            float totalGridWidth = columns * itemSize;
-            float totalGridHeight = rows * itemSize;
-            float columnGap = (W - totalGridWidth) / (columns + 1);
-            float rowGap = (H - totalGridHeight) / (rows + 1);
+            float subGapX = (subCellW - itemSize) / 2f;
+            float subGapY = (subCellH - itemSize) / 2f;
+            float columnGap = 2f * subGapX;
+            float rowGap = 2f * subGapY;
 
-            float startX = backgroundBounds.left + columnGap;
-            float startY = backgroundBounds.top + rowGap;
+            float startX = backgroundBounds.left + padding + subGapX;
+            float startY = backgroundBounds.top + padding + subGapY;
 
             return new FolderPreviewLayout.Grid(
                     columns,
@@ -334,7 +350,8 @@ public class PreviewItemManager {
                     startY,
                     itemSize,
                     columnGap,
-                    rowGap
+                    rowGap,
+                    featuredFirstItem
             );
         }
     }
@@ -794,7 +811,7 @@ public class PreviewItemManager {
         onParamsChanged();
     }
 
-    private void animateWorkspacePreviewResize(
+    void animateWorkspacePreviewResize(
             FolderPreviewLayout.Snapshot oldSnapshot,
             FolderPreviewLayout.Snapshot newSnapshot) {
         animateWorkspacePreviewParams(

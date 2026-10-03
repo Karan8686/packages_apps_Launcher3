@@ -564,6 +564,19 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
         }
     }
 
+    public void setBigFolderStyle(int style) {
+        if (mInfo == null || mInfo.getBigFolderStyle() == style) {
+            return;
+        }
+        FolderPreviewLayout.Snapshot oldSnapshot =
+                mPreviewItemManager.calculateWorkspacePreviewSnapshot();
+        mInfo.setBigFolderStyle(style, mActivity.getModelWriter());
+        FolderPreviewLayout.Snapshot newSnapshot =
+                mPreviewItemManager.calculateWorkspacePreviewSnapshot();
+        mPreviewItemManager.animateWorkspacePreviewResize(oldSnapshot, newSnapshot);
+        invalidate();
+    }
+
     private PreviewDropAnimationTarget prepareWorkspacePreviewDrop(
             ItemInfo item, int index) {
         FolderPreviewLayout.Snapshot oldSnapshot =
@@ -1148,7 +1161,11 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
             if (cellPaddingY <= 0) {
                 Paint.FontMetrics fm = mFolderName.getPaint().getFontMetrics();
                 int th = (int) Math.ceil(fm.bottom - fm.top);
-                cellPaddingY = Math.max(0, (cellHeight - (iconSize + iconPadding + th)) / 2);
+                float yFactor = (dp.getDeviceProperties().isTablet()
+                        || dp.getDeviceProperties().isTwoPanels()
+                        || dp.isVerticalBarLayout()) ? 0.5f : 0.6666667f;
+                cellPaddingY = Math.round(
+                        Math.max(0, cellHeight - (iconSize + iconPadding + th)) * yFactor);
             }
 
             int standardIconLabelTop = targetRow * (cellHeight + borderSpace.y)

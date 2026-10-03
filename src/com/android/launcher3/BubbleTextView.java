@@ -965,48 +965,19 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             return outBounds;
         }
 
-        int iconSize = mDeviceProfile.getWorkspaceIconProfile().getIconSizePx();
-        int previewSize = mDeviceProfile.folderIconSizePx;
-        Point borderSpace = mDeviceProfile.getWorkspaceIconProfile().getCellLayoutBorderSpacePx();
-        Point cellSize = mDeviceProfile.getWorkspaceIconProfile().getCellSize();
-
         int availableSpaceX = getWidth() > 0 ? getWidth()
                 : (getMeasuredWidth() > 0 ? getMeasuredWidth() : 0);
         int availableSpaceY = getHeight() > 0 ? getHeight()
                 : (getMeasuredHeight() > 0 ? getMeasuredHeight() : 0);
 
-        int cellWidth = availableSpaceX > 0
-                ? (spanX > 1 ? (availableSpaceX - (spanX - 1) * borderSpace.x) / spanX
-                        : availableSpaceX)
-                : (cellSize.x > 0 ? cellSize.x
-                        : mDeviceProfile.getWorkspaceIconProfile().getCellWidthPx());
-        int cellHeight = availableSpaceY > 0
-                ? (spanY > 1 ? (availableSpaceY - (spanY - 1) * borderSpace.y) / spanY
-                        : availableSpaceY)
-                : (cellSize.y > 0 ? cellSize.y
-                        : mDeviceProfile.getWorkspaceIconProfile().getCellHeightPx());
-
-        int cellPaddingY = getPaddingTop();
-        if (cellPaddingY <= 0) {
-            cellPaddingY = mDeviceProfile.getWorkspaceIconProfile().getCellYPaddingPx();
-        }
-        if (cellPaddingY <= 0) {
-            int iconTextHeight = Utilities.calculateTextHeight(
-                    mDeviceProfile.getWorkspaceIconProfile().getIconTextSizePx());
-            int contentHeight = iconSize
-                    + mDeviceProfile.getWorkspaceIconProfile().getIconDrawablePaddingPx()
-                    + iconTextHeight;
-            cellPaddingY = Math.max(0, (cellHeight - contentHeight) / 2);
-        }
-
-        int bgWidth = (spanX - 1) * (cellWidth + borderSpace.x) + previewSize;
-        int bgHeight = (spanY - 1) * (cellHeight + borderSpace.y) + previewSize;
-        int bgLeft = availableSpaceX > 0
-                ? (availableSpaceX - bgWidth) / 2
-                : (cellWidth - previewSize) / 2;
-        int bgTop = cellPaddingY + mDeviceProfile.folderIconOffsetYPx;
-
-        outBounds.set(bgLeft, bgTop, bgLeft + bgWidth, bgTop + bgHeight);
+        com.android.launcher3.folder.PreviewBackground.calculateBackgroundBounds(
+                mDeviceProfile,
+                availableSpaceX,
+                availableSpaceY,
+                getPaddingTop(),
+                spanX,
+                spanY,
+                outBounds);
         return outBounds;
     }
 
@@ -1019,7 +990,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         } else if (spanX == 1 && spanY == 2) {
             return bgBounds.width() / 2f;
         } else if (spanX == 2 && spanY == 2) {
-            return mDeviceProfile.getWorkspaceIconProfile().getIconSizePx() * 0.44f;
+            return mDeviceProfile.folderIconSizePx * 0.44f;
         }
         return mIconSize / 2f;
     }
