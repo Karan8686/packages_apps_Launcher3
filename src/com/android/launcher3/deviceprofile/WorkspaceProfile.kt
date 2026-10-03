@@ -182,19 +182,56 @@ data class WorkspaceProfile(
 
         // Match OOS Launcher WorkspaceParam vertical proportions on portrait phones:
         // OOS uses oplusLayoutWorkspacePaddingTopDp = 60dp from screen top (60/800 = 0.075f)
-        // and oplusLayoutCellLayoutHeightDp = 564dp on an 800dp screen (564/800 = 0.705f).
+        // and keeps row stride proportional to column width so that 2x2 folders and capsules
+        // are virtually square, 100% parallel with adjacent icons, and extra vertical space
+        // is balanced between top and bottom padding (no giant hole at the bottom).
         if (!isVerticalLayout && !deviceProperties.isTablet && !deviceProperties.isTwoPanels) {
             val oosTopFromScreenPx = Math.round(deviceProperties.heightPx * 0.075f)
             val targetTopPadding =
                 max(workspacePadding.top, max(0, oosTopFromScreenPx - insets.top))
             val availableHeightAfterTop =
                 deviceProperties.availableHeightPx - targetTopPadding - workspacePadding.bottom
-            val oosTargetCellLayoutHeight = Math.round(deviceProperties.heightPx * 0.705f)
-            val extraBottomPadding = max(0, availableHeightAfterTop - oosTargetCellLayoutHeight)
+
+            val numColumns = inv.numColumns
+            val bgPaddingHorizDp =
+                when {
+                    numColumns <= 3 -> 18f
+                    numColumns == 4 -> 10f
+                    else -> 4.7f
+                }
+            val oosBgPaddingHoriz = Math.round(bgPaddingHorizDp * res.displayMetrics.density)
+            val folderWidth = 2 * cellSize.x + cellLayoutBorderSpacePx.x - 2 * oosBgPaddingHoriz
+            val folderIconSize =
+                Math.round(
+                    iconSizePx * com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR
+                )
+            val contentHeight =
+                iconSizePx +
+                    iconDrawablePaddingPx +
+                    com.android.launcher3.Utilities.calculateTextHeight(iconTextSizePx.toFloat())
+            val folderIdealCellHeight = folderWidth - folderIconSize - cellLayoutBorderSpacePx.y
+            val maxRowHeight =
+                Math.round((deviceProperties.heightPx * 0.705f) / inv.numRows.toFloat())
+            val idealRowHeight =
+                if (inv.numRows >= 6) {
+                    max(contentHeight, folderIdealCellHeight)
+                } else {
+                    val blended = Math.round(folderIdealCellHeight * 0.6f + maxRowHeight * 0.4f)
+                    max(contentHeight, min(maxRowHeight, blended))
+                }
+
+            val targetCellLayoutHeight =
+                min(
+                    availableHeightAfterTop,
+                    inv.numRows * idealRowHeight + (inv.numRows - 1) * cellLayoutBorderSpacePx.y,
+                )
+            val excessHeight = max(0, availableHeightAfterTop - targetCellLayoutHeight)
+            val extraTopPadding = Math.round(excessHeight * 0.4f)
+            val extraBottomPadding = excessHeight - extraTopPadding
             workspacePadding =
                 Rect(
                     workspacePadding.left,
-                    targetTopPadding,
+                    targetTopPadding + extraTopPadding,
                     workspacePadding.right,
                     workspacePadding.bottom + extraBottomPadding,
                 )
