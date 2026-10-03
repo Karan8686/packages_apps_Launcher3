@@ -205,7 +205,17 @@ public class PreviewBackground extends DelegatedCellDrawing {
                 topPadding = cellPaddingY;
             }
             backgroundWidth = (spanX - 1) * (cellWidth + borderSpace.x) + previewSize;
-            backgroundHeight = (spanY - 1) * (cellHeight + borderSpace.y) + previewSize;
+
+            // For vertical span (spanY > 1), the background must extend below the icon
+            // circle in the last row to cover the label text area. Without this, the
+            // card is clipped short at the bottom.
+            int iconTextHeight = Utilities.calculateTextHeight(
+                    grid.getWorkspaceIconProfile().getIconTextSizePx());
+            int labelSpace = grid.getWorkspaceIconProfile().getIconDrawablePaddingPx()
+                    + iconTextHeight;
+            int verticalExtra = spanY > 1 ? labelSpace : 0;
+            backgroundHeight = (spanY - 1) * (cellHeight + borderSpace.y)
+                    + previewSize + verticalExtra;
             backgroundLeft = availableSpaceX > 0
                     ? (availableSpaceX - backgroundWidth) / 2
                     : (cellWidth - previewSize) / 2;

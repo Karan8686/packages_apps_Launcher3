@@ -961,7 +961,14 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
 
         int bgWidth = (spanX - 1) * (cellWidth + borderSpace.x) + previewSize;
-        int bgHeight = (spanY - 1) * (cellHeight + borderSpace.y) + previewSize;
+
+        // Extend height to include the label area below the icon circle in the last row
+        int iconTextHeight = Utilities.calculateTextHeight(
+                mDeviceProfile.getWorkspaceIconProfile().getIconTextSizePx());
+        int labelSpace = mDeviceProfile.getWorkspaceIconProfile().getIconDrawablePaddingPx()
+                + iconTextHeight;
+        int verticalExtra = spanY > 1 ? labelSpace : 0;
+        int bgHeight = (spanY - 1) * (cellHeight + borderSpace.y) + previewSize + verticalExtra;
         int bgLeft = (getWidth() - bgWidth) / 2;
         int bgTop = cellPaddingY + mDeviceProfile.folderIconOffsetYPx;
 
