@@ -184,12 +184,12 @@ data class WorkspaceProfile(
         // OOS uses oplusLayoutWorkspacePaddingTopDp = 60dp from screen top (60/800 = 0.075f)
         // and oplusLayoutCellLayoutHeightDp = 564dp on an 800dp screen (564/800 = 0.705f).
         if (!isVerticalLayout && !deviceProperties.isTablet && !deviceProperties.isTwoPanels) {
-            val oosTopFromScreenPx = Math.round(deviceProperties.windowHeightPx * 0.075f)
+            val oosTopFromScreenPx = Math.round(deviceProperties.heightPx * 0.075f)
             val targetTopPadding =
                 max(workspacePadding.top, max(0, oosTopFromScreenPx - insets.top))
             val availableHeightAfterTop =
                 deviceProperties.availableHeightPx - targetTopPadding - workspacePadding.bottom
-            val oosTargetCellLayoutHeight = Math.round(deviceProperties.windowHeightPx * 0.705f)
+            val oosTargetCellLayoutHeight = Math.round(deviceProperties.heightPx * 0.705f)
             val extraBottomPadding = max(0, availableHeightAfterTop - oosTargetCellLayoutHeight)
             workspacePadding =
                 Rect(
