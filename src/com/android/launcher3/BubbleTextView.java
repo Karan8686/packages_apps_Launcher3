@@ -599,7 +599,13 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         if (mIsShowingMinimalPopup) {
             iconDrawable.setAnimationEnabled(false);
         }
+        mSuperIconAdaptiveDrawable = null;
+        mSuperIconBadge = null;
+        mIsLoadingSuperIcon = false;
         setIcon(iconDrawable);
+        if (isMultiSpan()) {
+            loadSuperIconDrawableIfNecessary();
+        }
     }
 
     /**
@@ -907,6 +913,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     @SuppressWarnings("wrongcall")
     protected void drawWithoutDot(Canvas canvas) {
+        if (isMultiSpan()) {
+            drawMultiSpanSuperIcon(canvas);
+            return;
+        }
         super.onDraw(canvas);
     }
 

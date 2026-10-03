@@ -103,6 +103,10 @@ public class DoubleShadowBubbleTextView extends BubbleTextView {
 
     @Override
     public void onDraw(Canvas canvas) {
+        if (isMultiSpan()) {
+            super.onDraw(canvas);
+            return;
+        }
         if (shouldDrawAppContrastTile() && !TextUtils.isEmpty(getText())) {
             drawAppContrastTile(canvas);
         }
