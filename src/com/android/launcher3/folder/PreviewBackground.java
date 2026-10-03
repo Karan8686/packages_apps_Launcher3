@@ -210,6 +210,15 @@ public class PreviewBackground extends DelegatedCellDrawing {
                 backgroundLeft = availableSpaceX > 0
                         ? (availableSpaceX - backgroundWidth) / 2
                         : (cellWidth - previewSize) / 2;
+                if (spanY == 2) {
+                    int numColumns = grid.inv != null ? grid.inv.numColumns : 4;
+                    float bgPaddingHorizDp = numColumns <= 3 ? 18f : (numColumns == 4 ? 10f : 4.7f);
+                    int oosBgPaddingHoriz = Utilities.dpToPx(bgPaddingHorizDp);
+                    int iconAlignedPaddingHoriz = Math.max(0, (cellWidth - previewSize) / 2);
+                    int bgPaddingHoriz = Math.min(oosBgPaddingHoriz, iconAlignedPaddingHoriz);
+                    int matchingSpanWidth = 2 * cellWidth + borderSpace.x - 2 * bgPaddingHoriz;
+                    backgroundHeight = matchingSpanWidth;
+                }
             } else {
                 int numColumns = grid.inv != null ? grid.inv.numColumns : 4;
                 float bgPaddingHorizDp = numColumns <= 3 ? 18f : (numColumns == 4 ? 10f : 4.7f);
@@ -221,6 +230,9 @@ public class PreviewBackground extends DelegatedCellDrawing {
                         : (spanX * cellWidth + (spanX - 1) * borderSpace.x);
                 backgroundLeft = bgPaddingHoriz;
                 backgroundWidth = Math.max(previewSize, totalSpanWidth - 2 * bgPaddingHoriz);
+                if (spanX == 2 && spanY == 2) {
+                    backgroundHeight = backgroundWidth;
+                }
             }
         }
 
