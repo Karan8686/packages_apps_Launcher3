@@ -225,11 +225,7 @@ data class WorkspaceProfile(
                 0.6666667f
             }
         val updatedCellYPaddingPx =
-            if (cellYPaddingPx >= 0) {
-                Math.round(max(0, cellSize.y - finalContentHeight) * yPaddingFactor)
-            } else {
-                cellYPaddingPx
-            }
+            Math.round(max(0, cellSize.y - finalContentHeight) * yPaddingFactor)
 
         return copy(
             workspacePadding = workspacePadding,

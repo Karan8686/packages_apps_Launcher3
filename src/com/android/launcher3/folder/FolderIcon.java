@@ -1122,8 +1122,14 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
                 availableHeight = (availableHeight - (getCurrentSpanY() - 1) * rowGap)
                         / getCurrentSpanY();
             }
-            setPadding(getPaddingLeft(), (availableHeight
-                    - cellHeightPx) / 2, getPaddingRight(), getPaddingBottom());
+            int cellYPadding = mActivity.getDeviceProfile().getWorkspaceIconProfile().getCellYPaddingPx();
+            if (cellYPadding <= 0) {
+                float yFactor = (mActivity.getDeviceProfile().getDeviceProperties().isTablet()
+                        || mActivity.getDeviceProfile().getDeviceProperties().isTwoPanels()
+                        || mActivity.getDeviceProfile().isVerticalBarLayout()) ? 0.5f : 0.6666667f;
+                cellYPadding = Math.round(Math.max(0, (availableHeight - cellHeightPx) * yFactor));
+            }
+            setPadding(getPaddingLeft(), cellYPadding, getPaddingRight(), getPaddingBottom());
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
     }

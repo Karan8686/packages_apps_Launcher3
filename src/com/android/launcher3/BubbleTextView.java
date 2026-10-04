@@ -1170,7 +1170,38 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             return;
         }
         Rect bgBounds = getMultiSpanBackgroundBounds();
-        int textTop = bgBounds.bottom + getCompoundDrawablePadding();
+        int spanY = getSpanY();
+        int targetRow = spanY - 1;
+        DeviceProfile dp = mActivityContext.getDeviceProfile();
+        Point borderSpace = dp.getWorkspaceIconProfile().getCellLayoutBorderSpacePx();
+        Point cellSize = dp.getWorkspaceIconProfile().getCellSize();
+        int availableHeight = getHeight() > 0 ? getHeight() : getMeasuredHeight();
+        int cellHeight = availableHeight > 0
+                ? (spanY > 1 ? (availableHeight - (spanY - 1) * borderSpace.y) / spanY
+                        : availableHeight)
+                : (cellSize.y > 0 ? cellSize.y
+                        : dp.getWorkspaceIconProfile().getCellHeightPx());
+        int iconSize = dp.getWorkspaceIconProfile().getIconSizePx();
+        int iconPadding = getCompoundDrawablePadding();
+
+        int cellPaddingY = getPaddingTop();
+        if (cellPaddingY <= 0) {
+            cellPaddingY = dp.getWorkspaceIconProfile().getCellYPaddingPx();
+        }
+        if (cellPaddingY <= 0) {
+            int iconTextHeight = Utilities.calculateTextHeight(
+                    dp.getWorkspaceIconProfile().getIconTextSizePx());
+            int contentHeight = iconSize + iconPadding + iconTextHeight;
+            float yFactor = (dp.getDeviceProperties().isTablet()
+                    || dp.getDeviceProperties().isTwoPanels()
+                    || dp.isVerticalBarLayout()) ? 0.5f : 0.6666667f;
+            cellPaddingY = Math.round(Math.max(0, cellHeight - contentHeight) * yFactor);
+        }
+
+        int standardIconLabelTop = targetRow * (cellHeight + borderSpace.y)
+                + cellPaddingY + iconSize + iconPadding;
+
+        int textTop = Math.max(standardIconLabelTop, bgBounds.bottom + Math.max(1, iconPadding / 2));
         int textWidth = getLayout().getWidth();
         int textLeft = bgBounds.left + (bgBounds.width() - textWidth) / 2;
 
@@ -1453,7 +1484,14 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             int textHeight = shouldShowLabel()
                     ? (int) Math.ceil(fm.bottom - fm.top) * getCellSpecMaxTextLineCount() : 0;
             int cellHeightPx = mIconSize + getCompoundDrawablePadding() + textHeight;
-            setPadding(getPaddingLeft(), Math.max(0, (availableHeight - cellHeightPx) / 2),
+            int cellYPadding = mDeviceProfile.getWorkspaceIconProfile().getCellYPaddingPx();
+            if (cellYPadding <= 0) {
+                float yFactor = (mDeviceProfile.getDeviceProperties().isTablet()
+                        || mDeviceProfile.getDeviceProperties().isTwoPanels()
+                        || mDeviceProfile.isVerticalBarLayout()) ? 0.5f : 0.6666667f;
+                cellYPadding = Math.round(Math.max(0, (availableHeight - cellHeightPx) * yFactor));
+            }
+            setPadding(getPaddingLeft(), cellYPadding,
                     getPaddingRight(), getPaddingBottom());
         }
         if (shouldDrawAppContrastTile()) {
