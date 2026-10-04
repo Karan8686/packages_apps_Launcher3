@@ -1172,7 +1172,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         Rect bgBounds = getMultiSpanBackgroundBounds();
         int spanY = getSpanY();
         int targetRow = spanY - 1;
-        DeviceProfile dp = mActivityContext.getDeviceProfile();
+        DeviceProfile dp = mDeviceProfile;
         Point borderSpace = dp.getWorkspaceIconProfile().getCellLayoutBorderSpacePx();
         Point cellSize = dp.getWorkspaceIconProfile().getCellSize();
         int availableHeight = getHeight() > 0 ? getHeight() : getMeasuredHeight();
