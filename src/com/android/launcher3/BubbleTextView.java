@@ -51,6 +51,7 @@ import android.view.animation.Interpolator;
 import android.view.animation.PathInterpolator;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -76,6 +77,7 @@ import android.util.Property;
 import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.SoundEffectConstants;
 import android.view.View;
 import android.view.ViewDebug;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -86,6 +88,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
+import androidx.core.graphics.ColorUtils;
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 
 import com.android.launcher3.accessibility.BaseAccessibilityDelegate;
@@ -114,6 +117,8 @@ import com.android.launcher3.popup.PoppableType;
 import com.android.launcher3.popup.Popup;
 import com.android.launcher3.popup.PopupController;
 import com.android.launcher3.search.StringMatcherUtility;
+import com.android.launcher3.shortcuts.SuperIconShortcutHelper;
+import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.util.CancellableTask;
 import com.android.launcher3.util.CustomAppNameStore;
 import com.android.launcher3.util.IntArray;
@@ -281,6 +286,13 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     private AdaptiveIconDrawable mSuperIconAdaptiveDrawable;
     private Drawable mSuperIconBadge;
     private boolean mIsLoadingSuperIcon = false;
+    private List<WorkspaceItemInfo> mSuperIconShortcuts;
+    private boolean mIsLoadingShortcuts = false;
+    private final RectF[] mSlotBounds = new RectF[]{new RectF(), new RectF(), new RectF(), new RectF()};
+    private final float[] mSlotPressScales = new float[]{1.0f, 1.0f, 1.0f, 1.0f};
+    private final ValueAnimator[] mSlotPressAnimators = new ValueAnimator[4];
+    private int mActivePressedSlot = -1;
+    private int mLastClickedSlot = -1;
 
     public BubbleTextView(Context context) {
         this(context, null, 0);
@@ -428,6 +440,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         mSuperIconAdaptiveDrawable = null;
         mSuperIconBadge = null;
         mIsLoadingSuperIcon = false;
+        mSuperIconShortcuts = null;
+        mIsLoadingShortcuts = false;
+        mActivePressedSlot = -1;
+        mLastClickedSlot = -1;
         // Reset any shifty arrangements in case animation is disrupted.
         setPivotY(0);
         setAlpha(1);
@@ -602,9 +618,14 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         mSuperIconAdaptiveDrawable = null;
         mSuperIconBadge = null;
         mIsLoadingSuperIcon = false;
+        mSuperIconShortcuts = null;
+        mIsLoadingShortcuts = false;
+        mActivePressedSlot = -1;
+        mLastClickedSlot = -1;
         setIcon(iconDrawable);
         if (isMultiSpan()) {
             loadSuperIconDrawableIfNecessary();
+            loadSuperIconShortcutsIfNecessary();
         }
     }
 
@@ -780,6 +801,45 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 && shouldIgnoreTouchDown(event.getX(), event.getY())) {
             return false;
         }
+
+        if (hasQuickFunctions()) {
+            int action = event.getActionMasked();
+            float x = event.getX();
+            float y = event.getY();
+            switch (action) {
+                case MotionEvent.ACTION_DOWN:
+                    mActivePressedSlot = getSlotAt(x, y);
+                    mLastClickedSlot = mActivePressedSlot;
+                    if (mActivePressedSlot >= 0) {
+                        animateSlotPress(mActivePressedSlot, true);
+                    }
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    if (mActivePressedSlot >= 0) {
+                        int currentSlot = getSlotAt(x, y);
+                        if (currentSlot != mActivePressedSlot) {
+                            animateSlotPress(mActivePressedSlot, false);
+                            mActivePressedSlot = -1;
+                        }
+                    }
+                    break;
+                case MotionEvent.ACTION_UP:
+                    if (mActivePressedSlot >= 0) {
+                        mLastClickedSlot = mActivePressedSlot;
+                        animateSlotPress(mActivePressedSlot, false);
+                        mActivePressedSlot = -1;
+                    }
+                    break;
+                case MotionEvent.ACTION_CANCEL:
+                    if (mActivePressedSlot >= 0) {
+                        animateSlotPress(mActivePressedSlot, false);
+                        mActivePressedSlot = -1;
+                        mLastClickedSlot = -1;
+                    }
+                    break;
+            }
+        }
+
         if (isLongClickable()) {
             super.onTouchEvent(event);
             mLongPressHelper.onTouchEvent(event);
@@ -790,10 +850,115 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
     }
 
+    @Override
+    public boolean performClick() {
+        if (hasQuickFunctions() && mLastClickedSlot > 0) {
+            int slot = mLastClickedSlot;
+            mLastClickedSlot = -1;
+            int shortcutIndex = slot - 1;
+            if (mSuperIconShortcuts != null && shortcutIndex < mSuperIconShortcuts.size()) {
+                WorkspaceItemInfo shortcutItem = mSuperIconShortcuts.get(shortcutIndex);
+                Context context = getContext();
+                if (context != null) {
+                    Launcher launcher = Launcher.getLauncher(context);
+                    if (launcher != null) {
+                        playSoundEffect(SoundEffectConstants.CLICK);
+                        ItemClickHandler.onClickAppShortcut(this, shortcutItem, launcher);
+                        return true;
+                    }
+                }
+            }
+        }
+        mLastClickedSlot = -1;
+        return super.performClick();
+    }
+
+    @Override
+    public boolean performLongClick() {
+        mLastClickedSlot = -1;
+        if (mActivePressedSlot >= 0) {
+            animateSlotPress(mActivePressedSlot, false);
+            mActivePressedSlot = -1;
+        }
+        return super.performLongClick();
+    }
+
+    public boolean hasQuickFunctions() {
+        if (!isMultiSpan() || mSuperIconShortcuts == null || mSuperIconShortcuts.isEmpty()) {
+            return false;
+        }
+        int sx = getSpanX();
+        int sy = getSpanY();
+        return (sx == 2 && sy == 1) || (sx == 1 && sy == 2) || (sx == 2 && sy == 2);
+    }
+
+    private int getSlotAt(float x, float y) {
+        if (!hasQuickFunctions()) {
+            return -1;
+        }
+        Rect bgBounds = getMultiSpanBackgroundBounds();
+        if (!bgBounds.contains((int) x, (int) y)) {
+            return -1;
+        }
+        int spanX = getSpanX();
+        int spanY = getSpanY();
+
+        if (spanX == 2 && spanY == 1) {
+            int count = Math.min(3, 1 + (mSuperIconShortcuts != null ? mSuperIconShortcuts.size() : 0));
+            if (count <= 1) return 0;
+            float slotWidth = bgBounds.width() / (float) count;
+            int slotIndex = (int) ((x - bgBounds.left) / slotWidth);
+            slotIndex = Math.max(0, Math.min(count - 1, slotIndex));
+            if (mIsRtl) slotIndex = count - 1 - slotIndex;
+            return slotIndex;
+        } else if (spanX == 1 && spanY == 2) {
+            int count = Math.min(3, 1 + (mSuperIconShortcuts != null ? mSuperIconShortcuts.size() : 0));
+            if (count <= 1) return 0;
+            float slotHeight = bgBounds.height() / (float) count;
+            int slotIndex = (int) ((y - bgBounds.top) / slotHeight);
+            return Math.max(0, Math.min(count - 1, slotIndex));
+        } else if (spanX == 2 && spanY == 2) {
+            float midY = bgBounds.top + bgBounds.height() * 0.52f;
+            if (y < midY) {
+                return 0; // Top hero area -> Main app
+            }
+            int shortcutCount = mSuperIconShortcuts != null ? Math.min(3, mSuperIconShortcuts.size()) : 0;
+            if (shortcutCount <= 0) return 0;
+            float btnWidth = bgBounds.width() / (float) shortcutCount;
+            int shortcutIdx = (int) ((x - bgBounds.left) / btnWidth);
+            shortcutIdx = Math.max(0, Math.min(shortcutCount - 1, shortcutIdx));
+            if (mIsRtl) shortcutIdx = shortcutCount - 1 - shortcutIdx;
+            return shortcutIdx + 1; // Slot 1, 2, or 3
+        }
+        return 0;
+    }
+
+    private void animateSlotPress(int slotIndex, boolean pressed) {
+        if (slotIndex < 0 || slotIndex >= mSlotPressScales.length) {
+            return;
+        }
+        float targetScale = pressed ? 0.92f : 1.0f;
+        if (mSlotPressAnimators[slotIndex] != null) {
+            mSlotPressAnimators[slotIndex].cancel();
+        }
+        mSlotPressAnimators[slotIndex] = ValueAnimator.ofFloat(mSlotPressScales[slotIndex], targetScale);
+        mSlotPressAnimators[slotIndex].setDuration(pressed ? 120 : 180);
+        mSlotPressAnimators[slotIndex].setInterpolator(OOS_PRESS_INTERPOLATOR);
+        final int index = slotIndex;
+        mSlotPressAnimators[slotIndex].addUpdateListener(anim -> {
+            mSlotPressScales[index] = (float) anim.getAnimatedValue();
+            invalidate();
+        });
+        mSlotPressAnimators[slotIndex].start();
+    }
+
     /**
      * Returns true if the touch down at the provided position be ignored
      */
     protected boolean shouldIgnoreTouchDown(float x, float y) {
+        if (isMultiSpan()) {
+            return !getMultiSpanBackgroundBounds().contains((int) x, (int) y);
+        }
         if (mDisplay == DISPLAY_TASKBAR) {
             // Allow touching within padding on taskbar, given icon sizes are smaller.
             return false;
@@ -1011,6 +1176,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     public void setPressed(boolean pressed) {
         super.setPressed(pressed);
         if (isMultiSpan()) {
+            if (hasQuickFunctions()) {
+                return;
+            }
             float targetScale = pressed ? 0.96f : 1.0f;
             if (mSuperIconPressAnimator != null) {
                 mSuperIconPressAnimator.cancel();
@@ -1064,6 +1232,32 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         });
     }
 
+    public void loadSuperIconShortcutsIfNecessary() {
+        if (!isMultiSpan()) {
+            return;
+        }
+        int sx = getSpanX();
+        int sy = getSpanY();
+        if (!((sx == 2 && sy == 1) || (sx == 1 && sy == 2) || (sx == 2 && sy == 2))) {
+            return;
+        }
+        if (mSuperIconShortcuts != null || mIsLoadingShortcuts) {
+            return;
+        }
+        final ItemInfo itemInfo = (getTag() instanceof ItemInfo) ? (ItemInfo) getTag() : null;
+        if (itemInfo == null) {
+            return;
+        }
+        mIsLoadingShortcuts = true;
+        SuperIconShortcutHelper.loadShortcutsForApp(getContext(), itemInfo, shortcuts -> {
+            mIsLoadingShortcuts = false;
+            if (shortcuts != null && !shortcuts.isEmpty()) {
+                mSuperIconShortcuts = shortcuts;
+                invalidate();
+            }
+        });
+    }
+
     protected void drawMultiSpanSuperIcon(Canvas canvas) {
         if (!mIsIconVisible) {
             return;
@@ -1073,7 +1267,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         float radius = getIconBackgroundCornerRadius();
 
         canvas.save();
-        if (mSuperIconPressScale != 1.0f) {
+        if (!hasQuickFunctions() && mSuperIconPressScale != 1.0f) {
             canvas.scale(mSuperIconPressScale, mSuperIconPressScale, bgRectF.centerX(), bgRectF.centerY());
         }
 
@@ -1084,6 +1278,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
         if (mSuperIconAdaptiveDrawable == null && !mIsLoadingSuperIcon) {
             loadSuperIconDrawableIfNecessary();
+        }
+        if (mSuperIconShortcuts == null && !mIsLoadingShortcuts) {
+            loadSuperIconShortcutsIfNecessary();
         }
 
         // 1. Draw Background: stretch the app's icon background across the entire capsule/card
@@ -1111,7 +1308,251 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             canvas.drawRect(bgRectF, bgPaint);
         }
 
-        // 2. Draw Foreground Glyph
+        // 2. Draw Content: Quick Functions or Standard Foreground Glyph
+        if (hasQuickFunctions()) {
+            drawQuickFunctionsContent(canvas, bgBounds);
+        } else {
+            drawStandardSuperIconGlyph(canvas, bgBounds, bgRectF);
+        }
+
+        // 3. Draw Badge if present
+        if (mSuperIconBadge != null) {
+            int baseIconSize = mIconSize > 0 ? mIconSize
+                    : mDeviceProfile.getWorkspaceIconProfile().getIconSizePx();
+            int badgeSize = LauncherIcons.getBadgeSizeForIconSize(baseIconSize);
+            int badgePadding = Math.round(8f * getResources().getDisplayMetrics().density);
+            int badgeLeft = bgBounds.right - badgeSize - badgePadding;
+            int badgeTop = bgBounds.bottom - badgeSize - badgePadding;
+            mSuperIconBadge.setBounds(badgeLeft, badgeTop, badgeLeft + badgeSize, badgeTop + badgeSize);
+            mSuperIconBadge.draw(canvas);
+        }
+
+        canvas.restore();
+    }
+
+    private void drawQuickFunctionsContent(Canvas canvas, Rect bgBounds) {
+        int spanX = getSpanX();
+        int spanY = getSpanY();
+
+        int capsuleBgColor = 0;
+        if (getTag() instanceof ItemInfoWithIcon iiwi) {
+            capsuleBgColor = iiwi.bitmap.color;
+        }
+        if (capsuleBgColor == 0 || capsuleBgColor == Color.TRANSPARENT) {
+            capsuleBgColor = 0xFF2B2B2B;
+        }
+        boolean isDarkBg = ColorUtils.calculateLuminance(capsuleBgColor) < 0.5;
+        int buttonBgColor = isDarkBg
+                ? ColorUtils.setAlphaComponent(Color.WHITE, 40)
+                : ColorUtils.setAlphaComponent(Color.BLACK, 28);
+
+        Paint buttonPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        buttonPaint.setColor(buttonBgColor);
+        buttonPaint.setStyle(Paint.Style.FILL);
+
+        Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+
+        if (spanX == 2 && spanY == 1) {
+            draw2x1QuickFunctions(canvas, bgBounds, buttonPaint, bitmapPaint);
+        } else if (spanX == 1 && spanY == 2) {
+            draw1x2QuickFunctions(canvas, bgBounds, buttonPaint, bitmapPaint);
+        } else if (spanX == 2 && spanY == 2) {
+            draw2x2QuickFunctions(canvas, bgBounds, isDarkBg, buttonPaint, bitmapPaint);
+        }
+    }
+
+    private void draw2x1QuickFunctions(Canvas canvas, Rect bgBounds, Paint buttonPaint, Paint bitmapPaint) {
+        int shortcutCount = mSuperIconShortcuts != null ? Math.min(2, mSuperIconShortcuts.size()) : 0;
+        int totalSlots = Math.min(3, 1 + shortcutCount);
+        float slotWidth = bgBounds.width() / (float) totalSlots;
+        float slotDiameter = Math.min(bgBounds.height() * 0.72f, slotWidth * 0.85f);
+        float slotRadius = slotDiameter * 0.36f;
+
+        for (int i = 0; i < totalSlots; i++) {
+            float cx = mIsRtl
+                    ? (bgBounds.right - slotWidth * (i + 0.5f))
+                    : (bgBounds.left + slotWidth * (i + 0.5f));
+            float cy = bgBounds.centerY();
+            mSlotBounds[i].set(cx - slotDiameter / 2f, cy - slotDiameter / 2f,
+                    cx + slotDiameter / 2f, cy + slotDiameter / 2f);
+
+            canvas.save();
+            if (mSlotPressScales[i] != 1.0f) {
+                canvas.scale(mSlotPressScales[i], mSlotPressScales[i], cx, cy);
+            }
+
+            if (i == 0) {
+                drawAppIconGlyph(canvas, cx, cy, Math.round(slotDiameter * 0.82f));
+            } else {
+                int shortcutIndex = i - 1;
+                if (shortcutIndex < mSuperIconShortcuts.size()) {
+                    WorkspaceItemInfo shortcutItem = mSuperIconShortcuts.get(shortcutIndex);
+                    Path buttonPath = new Path();
+                    buttonPath.addRoundRect(mSlotBounds[i], slotRadius, slotRadius, Path.Direction.CW);
+                    canvas.drawPath(buttonPath, buttonPaint);
+
+                    if (shortcutItem != null && shortcutItem.bitmap != null
+                            && shortcutItem.bitmap.icon != null) {
+                        Bitmap shortcutIcon = shortcutItem.bitmap.icon;
+                        float iconGlyphSize = slotDiameter * 0.58f;
+                        RectF glyphDest = new RectF(
+                                cx - iconGlyphSize / 2f,
+                                cy - iconGlyphSize / 2f,
+                                cx + iconGlyphSize / 2f,
+                                cy + iconGlyphSize / 2f);
+                        canvas.drawBitmap(shortcutIcon, null, glyphDest, bitmapPaint);
+                    }
+                }
+            }
+            canvas.restore();
+        }
+    }
+
+    private void draw1x2QuickFunctions(Canvas canvas, Rect bgBounds, Paint buttonPaint, Paint bitmapPaint) {
+        int shortcutCount = mSuperIconShortcuts != null ? Math.min(2, mSuperIconShortcuts.size()) : 0;
+        int totalSlots = Math.min(3, 1 + shortcutCount);
+        float slotHeight = bgBounds.height() / (float) totalSlots;
+        float slotDiameter = Math.min(bgBounds.width() * 0.72f, slotHeight * 0.85f);
+        float slotRadius = slotDiameter * 0.36f;
+
+        for (int i = 0; i < totalSlots; i++) {
+            float cx = bgBounds.centerX();
+            float cy = bgBounds.top + slotHeight * (i + 0.5f);
+            mSlotBounds[i].set(cx - slotDiameter / 2f, cy - slotDiameter / 2f,
+                    cx + slotDiameter / 2f, cy + slotDiameter / 2f);
+
+            canvas.save();
+            if (mSlotPressScales[i] != 1.0f) {
+                canvas.scale(mSlotPressScales[i], mSlotPressScales[i], cx, cy);
+            }
+
+            if (i == 0) {
+                drawAppIconGlyph(canvas, cx, cy, Math.round(slotDiameter * 0.82f));
+            } else {
+                int shortcutIndex = i - 1;
+                if (shortcutIndex < mSuperIconShortcuts.size()) {
+                    WorkspaceItemInfo shortcutItem = mSuperIconShortcuts.get(shortcutIndex);
+                    Path buttonPath = new Path();
+                    buttonPath.addRoundRect(mSlotBounds[i], slotRadius, slotRadius, Path.Direction.CW);
+                    canvas.drawPath(buttonPath, buttonPaint);
+
+                    if (shortcutItem != null && shortcutItem.bitmap != null
+                            && shortcutItem.bitmap.icon != null) {
+                        Bitmap shortcutIcon = shortcutItem.bitmap.icon;
+                        float iconGlyphSize = slotDiameter * 0.58f;
+                        RectF glyphDest = new RectF(
+                                cx - iconGlyphSize / 2f,
+                                cy - iconGlyphSize / 2f,
+                                cx + iconGlyphSize / 2f,
+                                cy + iconGlyphSize / 2f);
+                        canvas.drawBitmap(shortcutIcon, null, glyphDest, bitmapPaint);
+                    }
+                }
+            }
+            canvas.restore();
+        }
+    }
+
+    private void draw2x2QuickFunctions(Canvas canvas, Rect bgBounds, boolean isDarkBg,
+            Paint buttonPaint, Paint bitmapPaint) {
+        float cardW = bgBounds.width();
+        float cardH = bgBounds.height();
+
+        // 1. Top Hero Area (Slot 0: Main App)
+        mSlotBounds[0].set(bgBounds.left, bgBounds.top, bgBounds.right, bgBounds.top + cardH * 0.52f);
+        canvas.save();
+        if (mSlotPressScales[0] != 1.0f) {
+            canvas.scale(mSlotPressScales[0], mSlotPressScales[0], mSlotBounds[0].centerX(), mSlotBounds[0].centerY());
+        }
+
+        float iconDiameter = cardH * 0.32f;
+        float iconCx = mIsRtl ? (bgBounds.right - cardW * 0.20f) : (bgBounds.left + cardW * 0.20f);
+        float iconCy = bgBounds.top + cardH * 0.26f;
+        drawAppIconGlyph(canvas, iconCx, iconCy, Math.round(iconDiameter * 0.88f));
+
+        // Draw App Label in Hero Area
+        CharSequence title = getText();
+        if (TextUtils.isEmpty(title) && getTag() instanceof ItemInfo ii) {
+            title = ii.title;
+        }
+        if (!TextUtils.isEmpty(title)) {
+            TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+            textPaint.setColor(isDarkBg ? Color.WHITE : 0xFF1F1F1F);
+            textPaint.setTextSize(getResources().getDisplayMetrics().density * 15f);
+            textPaint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
+
+            float textStartX = mIsRtl ? (bgBounds.left + cardW * 0.08f) : (bgBounds.left + cardW * 0.38f);
+            float maxTextW = cardW * 0.54f;
+            CharSequence ellipTitle = TextUtils.ellipsize(title, textPaint, maxTextW, TextUtils.TruncateAt.END);
+            Paint.FontMetrics fm = textPaint.getFontMetrics();
+            float textBaseline = iconCy - (fm.ascent + fm.descent) / 2f;
+            canvas.drawText(ellipTitle, 0, ellipTitle.length(), textStartX, textBaseline, textPaint);
+        }
+        canvas.restore();
+
+        // 2. Bottom Row: Quick Functions Buttons
+        int shortcutCount = mSuperIconShortcuts != null ? Math.min(3, mSuperIconShortcuts.size()) : 0;
+        if (shortcutCount > 0) {
+            float btnWidth = cardW / (float) shortcutCount;
+            float btnDiameter = Math.min(cardH * 0.34f, btnWidth * 0.72f);
+            float btnRadius = btnDiameter * 0.36f;
+            float btnCy = bgBounds.top + cardH * 0.74f;
+
+            for (int j = 0; j < shortcutCount; j++) {
+                int slotIdx = j + 1;
+                float btnCx = mIsRtl
+                        ? (bgBounds.right - btnWidth * (j + 0.5f))
+                        : (bgBounds.left + btnWidth * (j + 0.5f));
+                mSlotBounds[slotIdx].set(btnCx - btnDiameter / 2f, btnCy - btnDiameter / 2f,
+                        btnCx + btnDiameter / 2f, btnCy + btnDiameter / 2f);
+
+                canvas.save();
+                if (mSlotPressScales[slotIdx] != 1.0f) {
+                    canvas.scale(mSlotPressScales[slotIdx], mSlotPressScales[slotIdx], btnCx, btnCy);
+                }
+
+                Path buttonPath = new Path();
+                buttonPath.addRoundRect(mSlotBounds[slotIdx], btnRadius, btnRadius, Path.Direction.CW);
+                canvas.drawPath(buttonPath, buttonPaint);
+
+                WorkspaceItemInfo shortcutItem = mSuperIconShortcuts.get(j);
+                if (shortcutItem != null && shortcutItem.bitmap != null && shortcutItem.bitmap.icon != null) {
+                    Bitmap shortcutIcon = shortcutItem.bitmap.icon;
+                    float iconGlyphSize = btnDiameter * 0.58f;
+                    RectF glyphDest = new RectF(
+                            btnCx - iconGlyphSize / 2f,
+                            btnCy - iconGlyphSize / 2f,
+                            btnCx + iconGlyphSize / 2f,
+                            btnCy + iconGlyphSize / 2f);
+                    canvas.drawBitmap(shortcutIcon, null, glyphDest, bitmapPaint);
+                }
+                canvas.restore();
+            }
+        }
+    }
+
+    private void drawAppIconGlyph(Canvas canvas, float cx, float cy, int glyphTargetSize) {
+        boolean drewAdaptiveFg = false;
+        if (mSuperIconAdaptiveDrawable != null) {
+            Drawable fg = mSuperIconAdaptiveDrawable.getForeground();
+            if (fg != null) {
+                int fullFgSize = Math.round(glyphTargetSize * 1.5f);
+                int fgLeft = Math.round(cx - fullFgSize / 2f);
+                int fgTop = Math.round(cy - fullFgSize / 2f);
+                fg.setBounds(fgLeft, fgTop, fgLeft + fullFgSize, fgTop + fullFgSize);
+                fg.draw(canvas);
+                drewAdaptiveFg = true;
+            }
+        }
+        if (!drewAdaptiveFg && mIcon != null) {
+            int iconLeft = Math.round(cx - glyphTargetSize / 2f);
+            int iconTop = Math.round(cy - glyphTargetSize / 2f);
+            mIcon.setBounds(iconLeft, iconTop, iconLeft + glyphTargetSize, iconTop + glyphTargetSize);
+            mIcon.draw(canvas);
+        }
+    }
+
+    private void drawStandardSuperIconGlyph(Canvas canvas, Rect bgBounds, RectF bgRectF) {
         int spanX = getSpanX();
         int spanY = getSpanY();
         int glyphTargetSize;
@@ -1149,23 +1590,12 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 mIcon.draw(canvas);
             }
         }
-
-        // 3. Draw Badge if present
-        if (mSuperIconBadge != null) {
-            int baseIconSize = mIconSize > 0 ? mIconSize
-                    : mDeviceProfile.getWorkspaceIconProfile().getIconSizePx();
-            int badgeSize = LauncherIcons.getBadgeSizeForIconSize(baseIconSize);
-            int badgePadding = Math.round(8f * getResources().getDisplayMetrics().density);
-            int badgeLeft = bgBounds.right - badgeSize - badgePadding;
-            int badgeTop = bgBounds.bottom - badgeSize - badgePadding;
-            mSuperIconBadge.setBounds(badgeLeft, badgeTop, badgeLeft + badgeSize, badgeTop + badgeSize);
-            mSuperIconBadge.draw(canvas);
-        }
-
-        canvas.restore();
     }
 
     protected void drawMultiSpanLabel(Canvas canvas) {
+        if (hasQuickFunctions() && getSpanX() == 2 && getSpanY() == 2) {
+            return;
+        }
         if (!shouldTextBeVisible() || TextUtils.isEmpty(getText()) || getLayout() == null) {
             return;
         }
