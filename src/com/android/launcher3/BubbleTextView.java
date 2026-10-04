@@ -1483,6 +1483,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             Paint.FontMetrics fm = getPaint().getFontMetrics();
             int textHeight = shouldShowLabel()
                     ? (int) Math.ceil(fm.bottom - fm.top) * getCellSpecMaxTextLineCount() : 0;
+            int cellHeightPx = mIconSize + getCompoundDrawablePadding() + textHeight;
             int cellYPadding;
             if (mDisplay == DISPLAY_WORKSPACE) {
                 cellYPadding = mDeviceProfile.getWorkspaceIconProfile().getCellYPaddingPx();
