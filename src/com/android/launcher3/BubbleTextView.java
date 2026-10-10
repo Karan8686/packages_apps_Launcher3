@@ -57,6 +57,8 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Point;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.AdaptiveIconDrawable;
@@ -286,6 +288,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     private AdaptiveIconDrawable mSuperIconAdaptiveDrawable;
     private Drawable mSuperIconBadge;
     private boolean mIsLoadingSuperIcon = false;
+    private boolean mSuperIconLoadedWithTheme = false;
+    private Boolean mSuperIconFgHasOpaquePlate = null;
+    private static final java.util.WeakHashMap<Bitmap, Bitmap> sMonetGlyphCache =
+            new java.util.WeakHashMap<>();
     private List<WorkspaceItemInfo> mSuperIconShortcuts;
     private boolean mIsLoadingShortcuts = false;
     private final RectF[] mSlotBounds = new RectF[]{new RectF(), new RectF(), new RectF(), new RectF()};
@@ -293,6 +299,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     private final ValueAnimator[] mSlotPressAnimators = new ValueAnimator[4];
     private int mActivePressedSlot = -1;
     private int mLastClickedSlot = -1;
+    private boolean mIsDrawingDragView = false;
 
     public BubbleTextView(Context context) {
         this(context, null, 0);
@@ -439,6 +446,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
         mSuperIconAdaptiveDrawable = null;
         mSuperIconBadge = null;
+        mSuperIconFgHasOpaquePlate = null;
         mIsLoadingSuperIcon = false;
         mSuperIconShortcuts = null;
         mIsLoadingShortcuts = false;
@@ -485,13 +493,14 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     @UiThread
     public void applyFromWorkspaceItem(WorkspaceItemInfo info) {
-        applyIconAndLabel(info);
         setItemInfo(info);
+        applyIconAndLabel(info);
 
         applyDotState(info, false /* animate */);
         setDownloadStateContentDescription(info, info.getProgressLevel());
         if (isMultiSpan()) {
             loadSuperIconDrawableIfNecessary();
+            loadSuperIconShortcutsIfNecessary();
         }
     }
 
@@ -512,9 +521,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
      */
     @UiThread
     public void applyFromItemInfoWithIcon(ItemInfoWithIcon info) {
-        applyIconAndLabel(info);
-        // We don't need to check the info since it's not a WorkspaceItemInfo
         setItemInfo(info);
+        applyIconAndLabel(info);
 
         // Verify high res immediately
         verifyHighRes();
@@ -522,6 +530,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         setDownloadStateContentDescription(info, info.getProgressLevel());
         if (isMultiSpan()) {
             loadSuperIconDrawableIfNecessary();
+            loadSuperIconShortcutsIfNecessary();
         }
     }
 
@@ -617,8 +626,11 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
         mSuperIconAdaptiveDrawable = null;
         mSuperIconBadge = null;
+        mSuperIconFgHasOpaquePlate = null;
         mIsLoadingSuperIcon = false;
-        mSuperIconShortcuts = null;
+        List<WorkspaceItemInfo> cachedShortcuts = SuperIconShortcutHelper.getCachedShortcuts(info);
+        mSuperIconShortcuts = (cachedShortcuts != null && !cachedShortcuts.isEmpty())
+                ? cachedShortcuts : null;
         mIsLoadingShortcuts = false;
         mActivePressedSlot = -1;
         mLastClickedSlot = -1;
@@ -1083,7 +1095,36 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             drawMultiSpanLabel(canvas);
             return;
         }
+        if (mIcon != null && mIconSize > 0) {
+            Rect b = mIcon.getBounds();
+            if (b.left != 0 || b.top != 0 || b.width() != mIconSize || b.height() != mIconSize) {
+                mIcon.setBounds(0, 0, mIconSize, mIconSize);
+            }
+        }
         super.onDraw(canvas);
+    }
+
+    public void onResizeChanged() {
+        if (mSuperIconPressAnimator != null) {
+            mSuperIconPressAnimator.cancel();
+        }
+        mSuperIconPressScale = 1.0f;
+        for (int i = 0; i < mSlotPressScales.length; i++) {
+            if (mSlotPressAnimators[i] != null) {
+                mSlotPressAnimators[i].cancel();
+            }
+            mSlotPressScales[i] = 1.0f;
+        }
+        if (mIcon != null && mIconSize > 0) {
+            mIcon.setBounds(0, 0, mIconSize, mIconSize);
+        }
+        applyCompoundDrawables(getIconOrTransparentColor());
+        if (isMultiSpan()) {
+            loadSuperIconDrawableIfNecessary();
+            loadSuperIconShortcutsIfNecessary();
+        }
+        requestLayout();
+        invalidate();
     }
 
     @Nullable
@@ -1172,6 +1213,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     private static final Interpolator OOS_PRESS_INTERPOLATOR =
             new PathInterpolator(0.4f, 0.0f, 0.2f, 1.0f);
 
+    public float getSuperIconPressScale() {
+        return hasQuickFunctions() ? 1.0f : mSuperIconPressScale;
+    }
+
     @Override
     public void setPressed(boolean pressed) {
         super.setPressed(pressed);
@@ -1194,6 +1239,51 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
     }
 
+    private boolean isMonetThemeActive() {
+        return shouldUseTheme() && ThemeManager.INSTANCE.get(getContext()).isIconThemeEnabled();
+    }
+
+    private int[] getMonetColors() {
+        Context context = getContext();
+        boolean isNight = (context.getResources().getConfiguration().uiMode
+                & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+                == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        int bgColor = context.getColor(isNight
+                ? android.R.color.system_neutral1_800
+                : android.R.color.system_accent1_100);
+        int fgColor = context.getColor(isNight
+                ? android.R.color.system_accent1_100
+                : android.R.color.system_neutral2_700);
+        try {
+            com.android.launcher3.icons.IconThemeController controller =
+                    ThemeManager.INSTANCE.get(context).getThemeController();
+            if (controller != null) {
+                AdaptiveIconDrawable probe = new AdaptiveIconDrawable(
+                        new ColorDrawable(Color.BLACK), null, new ColorDrawable(Color.WHITE));
+                AdaptiveIconDrawable themed = controller.createThemedAdaptiveIcon(
+                        context, probe, null);
+                if (themed != null) {
+                    if (themed.getBackground() instanceof ColorDrawable cd) {
+                        bgColor = cd.getColor();
+                    }
+                    Drawable fg = themed.getForeground();
+                    if (fg != null) {
+                        Bitmap pixel = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
+                        Canvas c = new Canvas(pixel);
+                        fg.setBounds(0, 0, 1, 1);
+                        fg.draw(c);
+                        int sampled = pixel.getPixel(0, 0);
+                        if (Color.alpha(sampled) > 200) {
+                            fgColor = sampled;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return new int[]{ bgColor, fgColor };
+    }
+
     public void loadSuperIconDrawableIfNecessary() {
         if (!isMultiSpan()) {
             return;
@@ -1208,7 +1298,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         mIsLoadingSuperIcon = true;
         final int w = getWidth() > 0 ? getWidth() : mIconSize;
         final int h = getHeight() > 0 ? getHeight() : mIconSize;
-        final boolean useTheme = ThemeManager.INSTANCE.get(getContext()).isIconThemeEnabled();
+        final boolean useTheme = isMonetThemeActive();
         final Context context = getContext();
 
         MODEL_EXECUTOR.getHandler().postAtFrontOfQueue(() -> {
@@ -1226,6 +1316,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 if (result != null && result.first != null) {
                     mSuperIconAdaptiveDrawable = result.first;
                     mSuperIconBadge = result.second;
+                    mSuperIconLoadedWithTheme = useTheme;
+                    mSuperIconFgHasOpaquePlate = null;
                     invalidate();
                 }
             });
@@ -1248,6 +1340,13 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         if (itemInfo == null) {
             return;
         }
+        List<WorkspaceItemInfo> cached = SuperIconShortcutHelper.getCachedShortcuts(itemInfo);
+        if (cached != null) {
+            if (!cached.isEmpty()) {
+                mSuperIconShortcuts = cached;
+            }
+            return;
+        }
         mIsLoadingShortcuts = true;
         SuperIconShortcutHelper.loadShortcutsForApp(getContext(), itemInfo, shortcuts -> {
             mIsLoadingShortcuts = false;
@@ -1256,6 +1355,17 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 invalidate();
             }
         });
+    }
+
+    public void drawSuperIconContentForFloatingView(Canvas canvas, Rect bgBounds) {
+        if (mSuperIconShortcuts == null && !mIsLoadingShortcuts) {
+            loadSuperIconShortcutsIfNecessary();
+        }
+        if (hasQuickFunctions()) {
+            drawQuickFunctionsContent(canvas, bgBounds);
+        } else {
+            drawStandardSuperIconGlyph(canvas, bgBounds, new RectF(bgBounds));
+        }
     }
 
     protected void drawMultiSpanSuperIcon(Canvas canvas) {
@@ -1275,6 +1385,14 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         Path clipPath = new Path();
         clipPath.addRoundRect(bgRectF, radius, radius, Path.Direction.CW);
         canvas.clipPath(clipPath);
+
+        boolean useTheme = isMonetThemeActive();
+        if (mSuperIconAdaptiveDrawable != null && mSuperIconLoadedWithTheme != useTheme) {
+            mSuperIconAdaptiveDrawable = null;
+            mSuperIconBadge = null;
+            mSuperIconFgHasOpaquePlate = null;
+            mIsLoadingSuperIcon = false;
+        }
 
         if (mSuperIconAdaptiveDrawable == null && !mIsLoadingSuperIcon) {
             loadSuperIconDrawableIfNecessary();
@@ -1296,7 +1414,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
         if (!drewAdaptiveBg) {
             int fallbackBgColor = 0;
-            if (getTag() instanceof ItemInfoWithIcon iiwi) {
+            if (useTheme) {
+                fallbackBgColor = getMonetColors()[0];
+            } else if (getTag() instanceof ItemInfoWithIcon iiwi) {
                 fallbackBgColor = iiwi.bitmap.color;
             }
             if (fallbackBgColor == 0 || fallbackBgColor == Color.TRANSPARENT) {
@@ -1333,40 +1453,56 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     private void drawQuickFunctionsContent(Canvas canvas, Rect bgBounds) {
         int spanX = getSpanX();
         int spanY = getSpanY();
+        boolean useTheme = isMonetThemeActive();
 
-        int capsuleBgColor = 0;
-        if (getTag() instanceof ItemInfoWithIcon iiwi) {
-            capsuleBgColor = iiwi.bitmap.color;
-        }
-        if (capsuleBgColor == 0 || capsuleBgColor == Color.TRANSPARENT) {
-            capsuleBgColor = 0xFF2B2B2B;
-        }
-        boolean isDarkBg = ColorUtils.calculateLuminance(capsuleBgColor) < 0.5;
-        int buttonBgColor = isDarkBg
-                ? ColorUtils.setAlphaComponent(Color.WHITE, 40)
-                : ColorUtils.setAlphaComponent(Color.BLACK, 28);
+        int buttonFillColor;
+        int strokeColor;
+        int monetFgColor;
+        boolean isDarkBg;
 
-        Paint buttonPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        buttonPaint.setColor(buttonBgColor);
-        buttonPaint.setStyle(Paint.Style.FILL);
+        if (useTheme) {
+            int[] monetColors = getMonetColors();
+            int monetBg = monetColors[0];
+            monetFgColor = monetColors[1];
+            buttonFillColor = monetBg;
+            strokeColor = ColorUtils.setAlphaComponent(monetFgColor, 72);
+            isDarkBg = ColorUtils.calculateLuminance(monetBg) < 0.5;
+        } else {
+            int capsuleBgColor = 0;
+            if (mSuperIconAdaptiveDrawable != null
+                    && mSuperIconAdaptiveDrawable.getBackground() instanceof ColorDrawable cd) {
+                capsuleBgColor = cd.getColor();
+            }
+            if ((capsuleBgColor == 0 || capsuleBgColor == Color.TRANSPARENT)
+                    && getTag() instanceof ItemInfoWithIcon iiwi) {
+                capsuleBgColor = iiwi.bitmap.color;
+            }
+            if (capsuleBgColor == 0 || capsuleBgColor == Color.TRANSPARENT) {
+                capsuleBgColor = 0xFF2B2B2B;
+            }
+            isDarkBg = ColorUtils.calculateLuminance(capsuleBgColor) < 0.5;
+            buttonFillColor = Color.WHITE;
+            strokeColor = 0x26000000;
+            monetFgColor = 0;
+        }
 
         Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
 
         if (spanX == 2 && spanY == 1) {
-            draw2x1QuickFunctions(canvas, bgBounds, buttonPaint, bitmapPaint);
+            draw2x1QuickFunctions(canvas, bgBounds, buttonFillColor, strokeColor, monetFgColor, bitmapPaint);
         } else if (spanX == 1 && spanY == 2) {
-            draw1x2QuickFunctions(canvas, bgBounds, buttonPaint, bitmapPaint);
+            draw1x2QuickFunctions(canvas, bgBounds, buttonFillColor, strokeColor, monetFgColor, bitmapPaint);
         } else if (spanX == 2 && spanY == 2) {
-            draw2x2QuickFunctions(canvas, bgBounds, isDarkBg, buttonPaint, bitmapPaint);
+            draw2x2QuickFunctions(canvas, bgBounds, isDarkBg, buttonFillColor, strokeColor, monetFgColor, bitmapPaint);
         }
     }
 
-    private void draw2x1QuickFunctions(Canvas canvas, Rect bgBounds, Paint buttonPaint, Paint bitmapPaint) {
+    private void draw2x1QuickFunctions(Canvas canvas, Rect bgBounds,
+            int buttonFillColor, int strokeColor, int monetFgColor, Paint bitmapPaint) {
         int shortcutCount = mSuperIconShortcuts != null ? Math.min(2, mSuperIconShortcuts.size()) : 0;
         int totalSlots = Math.min(3, 1 + shortcutCount);
         float slotWidth = bgBounds.width() / (float) totalSlots;
         float slotDiameter = Math.min(bgBounds.height() * 0.72f, slotWidth * 0.85f);
-        float slotRadius = slotDiameter * 0.36f;
 
         for (int i = 0; i < totalSlots; i++) {
             float cx = mIsRtl
@@ -1387,33 +1523,20 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 int shortcutIndex = i - 1;
                 if (shortcutIndex < mSuperIconShortcuts.size()) {
                     WorkspaceItemInfo shortcutItem = mSuperIconShortcuts.get(shortcutIndex);
-                    Path buttonPath = new Path();
-                    buttonPath.addRoundRect(mSlotBounds[i], slotRadius, slotRadius, Path.Direction.CW);
-                    canvas.drawPath(buttonPath, buttonPaint);
-
-                    if (shortcutItem != null && shortcutItem.bitmap != null
-                            && shortcutItem.bitmap.icon != null) {
-                        Bitmap shortcutIcon = shortcutItem.bitmap.icon;
-                        float iconGlyphSize = slotDiameter * 0.58f;
-                        RectF glyphDest = new RectF(
-                                cx - iconGlyphSize / 2f,
-                                cy - iconGlyphSize / 2f,
-                                cx + iconGlyphSize / 2f,
-                                cy + iconGlyphSize / 2f);
-                        canvas.drawBitmap(shortcutIcon, null, glyphDest, bitmapPaint);
-                    }
+                    drawShortcutCircleButton(canvas, cx, cy, slotDiameter, shortcutItem,
+                            buttonFillColor, strokeColor, monetFgColor, bitmapPaint);
                 }
             }
             canvas.restore();
         }
     }
 
-    private void draw1x2QuickFunctions(Canvas canvas, Rect bgBounds, Paint buttonPaint, Paint bitmapPaint) {
+    private void draw1x2QuickFunctions(Canvas canvas, Rect bgBounds,
+            int buttonFillColor, int strokeColor, int monetFgColor, Paint bitmapPaint) {
         int shortcutCount = mSuperIconShortcuts != null ? Math.min(2, mSuperIconShortcuts.size()) : 0;
         int totalSlots = Math.min(3, 1 + shortcutCount);
         float slotHeight = bgBounds.height() / (float) totalSlots;
         float slotDiameter = Math.min(bgBounds.width() * 0.72f, slotHeight * 0.85f);
-        float slotRadius = slotDiameter * 0.36f;
 
         for (int i = 0; i < totalSlots; i++) {
             float cx = bgBounds.centerX();
@@ -1432,21 +1555,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 int shortcutIndex = i - 1;
                 if (shortcutIndex < mSuperIconShortcuts.size()) {
                     WorkspaceItemInfo shortcutItem = mSuperIconShortcuts.get(shortcutIndex);
-                    Path buttonPath = new Path();
-                    buttonPath.addRoundRect(mSlotBounds[i], slotRadius, slotRadius, Path.Direction.CW);
-                    canvas.drawPath(buttonPath, buttonPaint);
-
-                    if (shortcutItem != null && shortcutItem.bitmap != null
-                            && shortcutItem.bitmap.icon != null) {
-                        Bitmap shortcutIcon = shortcutItem.bitmap.icon;
-                        float iconGlyphSize = slotDiameter * 0.58f;
-                        RectF glyphDest = new RectF(
-                                cx - iconGlyphSize / 2f,
-                                cy - iconGlyphSize / 2f,
-                                cx + iconGlyphSize / 2f,
-                                cy + iconGlyphSize / 2f);
-                        canvas.drawBitmap(shortcutIcon, null, glyphDest, bitmapPaint);
-                    }
+                    drawShortcutCircleButton(canvas, cx, cy, slotDiameter, shortcutItem,
+                            buttonFillColor, strokeColor, monetFgColor, bitmapPaint);
                 }
             }
             canvas.restore();
@@ -1454,7 +1564,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     }
 
     private void draw2x2QuickFunctions(Canvas canvas, Rect bgBounds, boolean isDarkBg,
-            Paint buttonPaint, Paint bitmapPaint) {
+            int buttonFillColor, int strokeColor, int monetFgColor, Paint bitmapPaint) {
         float cardW = bgBounds.width();
         float cardH = bgBounds.height();
 
@@ -1477,7 +1587,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
         if (!TextUtils.isEmpty(title)) {
             TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-            textPaint.setColor(isDarkBg ? Color.WHITE : 0xFF1F1F1F);
+            textPaint.setColor(monetFgColor != 0 ? monetFgColor : (isDarkBg ? Color.WHITE : 0xFF1F1F1F));
             textPaint.setTextSize(getResources().getDisplayMetrics().density * 15f);
             textPaint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
 
@@ -1495,7 +1605,6 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         if (shortcutCount > 0) {
             float btnWidth = cardW / (float) shortcutCount;
             float btnDiameter = Math.min(cardH * 0.34f, btnWidth * 0.72f);
-            float btnRadius = btnDiameter * 0.36f;
             float btnCy = bgBounds.top + cardH * 0.74f;
 
             for (int j = 0; j < shortcutCount; j++) {
@@ -1511,44 +1620,261 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                     canvas.scale(mSlotPressScales[slotIdx], mSlotPressScales[slotIdx], btnCx, btnCy);
                 }
 
-                Path buttonPath = new Path();
-                buttonPath.addRoundRect(mSlotBounds[slotIdx], btnRadius, btnRadius, Path.Direction.CW);
-                canvas.drawPath(buttonPath, buttonPaint);
-
                 WorkspaceItemInfo shortcutItem = mSuperIconShortcuts.get(j);
-                if (shortcutItem != null && shortcutItem.bitmap != null && shortcutItem.bitmap.icon != null) {
-                    Bitmap shortcutIcon = shortcutItem.bitmap.icon;
-                    float iconGlyphSize = btnDiameter * 0.58f;
-                    RectF glyphDest = new RectF(
-                            btnCx - iconGlyphSize / 2f,
-                            btnCy - iconGlyphSize / 2f,
-                            btnCx + iconGlyphSize / 2f,
-                            btnCy + iconGlyphSize / 2f);
-                    canvas.drawBitmap(shortcutIcon, null, glyphDest, bitmapPaint);
-                }
+                drawShortcutCircleButton(canvas, btnCx, btnCy, btnDiameter, shortcutItem,
+                        buttonFillColor, strokeColor, monetFgColor, bitmapPaint);
                 canvas.restore();
             }
         }
     }
 
+    private void drawShortcutCircleButton(Canvas canvas, float cx, float cy, float diameter,
+            WorkspaceItemInfo shortcutItem, int buttonFillColor, int strokeColor,
+            int monetFgColor, Paint bitmapPaint) {
+        float radius = diameter / 2f;
+        Path circlePath = new Path();
+        circlePath.addCircle(cx, cy, radius, Path.Direction.CW);
+
+        Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        fillPaint.setStyle(Paint.Style.FILL);
+        fillPaint.setColor(buttonFillColor);
+        canvas.drawPath(circlePath, fillPaint);
+
+        if (shortcutItem != null && shortcutItem.bitmap != null && shortcutItem.bitmap.icon != null) {
+            Bitmap shortcutIcon = shortcutItem.bitmap.icon;
+            canvas.save();
+            canvas.clipPath(circlePath);
+
+            float drawRadius = radius * 1.04f;
+            RectF dest = new RectF(cx - drawRadius, cy - drawRadius, cx + drawRadius, cy + drawRadius);
+
+            if (monetFgColor != 0) {
+                Bitmap glyphMask = getOrCreateMonetGlyphBitmap(shortcutIcon);
+                if (glyphMask != null) {
+                    bitmapPaint.setColorFilter(
+                            new PorterDuffColorFilter(monetFgColor, PorterDuff.Mode.SRC_IN));
+                    canvas.drawBitmap(glyphMask, null, dest, bitmapPaint);
+                    bitmapPaint.setColorFilter(null);
+                }
+            } else {
+                bitmapPaint.setColorFilter(null);
+                canvas.drawBitmap(shortcutIcon, null, dest, bitmapPaint);
+            }
+            canvas.restore();
+        }
+
+        float strokeWidth = Math.max(1f, getResources().getDisplayMetrics().density * 0.95f);
+        Paint strokePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        strokePaint.setStyle(Paint.Style.STROKE);
+        strokePaint.setStrokeWidth(strokeWidth);
+        strokePaint.setColor(strokeColor);
+        canvas.drawCircle(cx, cy, radius - strokeWidth / 2f, strokePaint);
+    }
+
+    private static Bitmap getOrCreateMonetGlyphBitmap(Bitmap src) {
+        if (src == null || src.getWidth() < 8 || src.getHeight() < 8) {
+            return src;
+        }
+        synchronized (sMonetGlyphCache) {
+            Bitmap cached = sMonetGlyphCache.get(src);
+            if (cached != null && !cached.isRecycled()) {
+                return cached;
+            }
+        }
+        try {
+            Bitmap sw = src.getConfig() == Bitmap.Config.HARDWARE
+                    ? src.copy(Bitmap.Config.ARGB_8888, false)
+                    : src;
+            if (sw == null) {
+                return src;
+            }
+            int w = sw.getWidth();
+            int h = sw.getHeight();
+            int[] pixels = new int[w * h];
+            sw.getPixels(pixels, 0, w, 0, 0, w, h);
+
+            float cx = w / 2f;
+            float cy = h / 2f;
+            float minDim = Math.min(w, h);
+            float sampleRadius = minDim * 0.33f;
+
+            int[] sampleR = new int[12];
+            int[] sampleG = new int[12];
+            int[] sampleB = new int[12];
+            int validSamples = 0;
+            for (int i = 0; i < 12; i++) {
+                double angle = (Math.PI * 2.0 * i) / 12.0;
+                int sx = Math.min(w - 1, Math.max(0, Math.round(cx + (float) Math.cos(angle) * sampleRadius)));
+                int sy = Math.min(h - 1, Math.max(0, Math.round(cy + (float) Math.sin(angle) * sampleRadius)));
+                int c = pixels[sy * w + sx];
+                int a = (c >>> 24) & 0xFF;
+                if (a > 160) {
+                    sampleR[validSamples] = (c >> 16) & 0xFF;
+                    sampleG[validSamples] = (c >> 8) & 0xFF;
+                    sampleB[validSamples] = c & 0xFF;
+                    validSamples++;
+                }
+            }
+
+            int plateR = 255;
+            int plateG = 255;
+            int plateB = 255;
+            if (validSamples > 0) {
+                java.util.Arrays.sort(sampleR, 0, validSamples);
+                java.util.Arrays.sort(sampleG, 0, validSamples);
+                java.util.Arrays.sort(sampleB, 0, validSamples);
+                int mid = validSamples / 2;
+                plateR = sampleR[mid];
+                plateG = sampleG[mid];
+                plateB = sampleB[mid];
+            }
+
+            float innerClipRadius = minDim * 0.31f;
+            float outerClipRadius = minDim * 0.35f;
+            int[] outPixels = new int[w * h];
+
+            for (int y = 0; y < h; y++) {
+                float dy = y - cy;
+                int rowOffset = y * w;
+                for (int x = 0; x < w; x++) {
+                    float dx = x - cx;
+                    float dist = (float) Math.hypot(dx, dy);
+                    if (dist >= outerClipRadius) {
+                        continue;
+                    }
+                    int c = pixels[rowOffset + x];
+                    int a = (c >>> 24) & 0xFF;
+                    if (a < 40) {
+                        continue;
+                    }
+                    int r = (c >> 16) & 0xFF;
+                    int g = (c >> 8) & 0xFF;
+                    int b = c & 0xFF;
+                    int maxDiff = Math.max(Math.abs(r - plateR),
+                            Math.max(Math.abs(g - plateG), Math.abs(b - plateB)));
+                    if (maxDiff <= 24) {
+                        continue;
+                    }
+                    float glyphAlpha = Math.min(1f, (maxDiff - 24f) / 60f);
+                    if (dist > innerClipRadius) {
+                        glyphAlpha *= (outerClipRadius - dist) / (outerClipRadius - innerClipRadius);
+                    }
+                    int finalAlpha = Math.round(glyphAlpha * a);
+                    if (finalAlpha > 0) {
+                        outPixels[rowOffset + x] = (finalAlpha << 24) | 0x00FFFFFF;
+                    }
+                }
+            }
+
+            Bitmap mask = Bitmap.createBitmap(outPixels, w, h, Bitmap.Config.ARGB_8888);
+            synchronized (sMonetGlyphCache) {
+                sMonetGlyphCache.put(src, mask);
+            }
+            return mask;
+        } catch (Exception ignored) {
+            return src;
+        }
+    }
+
+    private boolean hasOpaquePlateRing(Drawable fg) {
+        if (fg == null) {
+            return false;
+        }
+        if (mSuperIconFgHasOpaquePlate != null) {
+            return mSuperIconFgHasOpaquePlate;
+        }
+        try {
+            int size = 96;
+            Bitmap probe = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            Canvas c = new Canvas(probe);
+            Rect prev = new Rect(fg.getBounds());
+            fg.setBounds(0, 0, size, size);
+            fg.draw(c);
+            fg.setBounds(prev);
+
+            float center = size / 2f;
+            float ringRadius = size * 0.27f;
+            int opaqueCount = 0;
+            for (int i = 0; i < 8; i++) {
+                double angle = (Math.PI * 2.0 * i) / 8.0;
+                int px = Math.round(center + (float) Math.cos(angle) * ringRadius);
+                int py = Math.round(center + (float) Math.sin(angle) * ringRadius);
+                int alpha = (probe.getPixel(px, py) >>> 24) & 0xFF;
+                if (alpha > 180) {
+                    opaqueCount++;
+                }
+            }
+            mSuperIconFgHasOpaquePlate = opaqueCount >= 6;
+            return mSuperIconFgHasOpaquePlate;
+        } catch (Exception ignored) {
+            mSuperIconFgHasOpaquePlate = false;
+            return false;
+        }
+    }
+
+    private boolean drawMonetExtractedAppGlyph(Canvas canvas, float cx, float cy, int glyphTargetSize) {
+        if (!(getTag() instanceof ItemInfoWithIcon iiwi)
+                || iiwi.bitmap == null || iiwi.bitmap.icon == null) {
+            return false;
+        }
+        Bitmap glyphMask = getOrCreateMonetGlyphBitmap(iiwi.bitmap.icon);
+        if (glyphMask == null) {
+            return false;
+        }
+        int monetFgColor = getMonetColors()[1];
+        float drawSize = glyphTargetSize * 1.15f;
+        RectF dest = new RectF(
+                cx - drawSize / 2f,
+                cy - drawSize / 2f,
+                cx + drawSize / 2f,
+                cy + drawSize / 2f);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        paint.setColorFilter(new PorterDuffColorFilter(monetFgColor, PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(glyphMask, null, dest, paint);
+        return true;
+    }
+
     private void drawAppIconGlyph(Canvas canvas, float cx, float cy, int glyphTargetSize) {
+        boolean useTheme = isMonetThemeActive();
         boolean drewAdaptiveFg = false;
         if (mSuperIconAdaptiveDrawable != null) {
             Drawable fg = mSuperIconAdaptiveDrawable.getForeground();
             if (fg != null) {
-                int fullFgSize = Math.round(glyphTargetSize * 1.5f);
-                int fgLeft = Math.round(cx - fullFgSize / 2f);
-                int fgTop = Math.round(cy - fullFgSize / 2f);
-                fg.setBounds(fgLeft, fgTop, fgLeft + fullFgSize, fgTop + fullFgSize);
-                fg.draw(canvas);
-                drewAdaptiveFg = true;
+                if (useTheme && hasOpaquePlateRing(fg)) {
+                    drewAdaptiveFg = drawMonetExtractedAppGlyph(canvas, cx, cy, glyphTargetSize);
+                }
+                if (!drewAdaptiveFg) {
+                    boolean isLegacyWrapped = fg.getClass().getName().contains("FixedScaleDrawable");
+                    int fullFgSize = Math.round(glyphTargetSize * (isLegacyWrapped ? 2.15f : 1.5f));
+                    int fgLeft = Math.round(cx - fullFgSize / 2f);
+                    int fgTop = Math.round(cy - fullFgSize / 2f);
+                    canvas.save();
+                    if (isLegacyWrapped) {
+                        Path clipCircle = new Path();
+                        clipCircle.addCircle(cx, cy, glyphTargetSize / 2f, Path.Direction.CW);
+                        canvas.clipPath(clipCircle);
+                    }
+                    fg.setBounds(fgLeft, fgTop, fgLeft + fullFgSize, fgTop + fullFgSize);
+                    fg.draw(canvas);
+                    canvas.restore();
+                    drewAdaptiveFg = true;
+                }
             }
         }
+        if (!drewAdaptiveFg && useTheme) {
+            drewAdaptiveFg = drawMonetExtractedAppGlyph(canvas, cx, cy, glyphTargetSize);
+        }
         if (!drewAdaptiveFg && mIcon != null) {
+            Rect prevBounds = new Rect(mIcon.getBounds());
             int iconLeft = Math.round(cx - glyphTargetSize / 2f);
             int iconTop = Math.round(cy - glyphTargetSize / 2f);
             mIcon.setBounds(iconLeft, iconTop, iconLeft + glyphTargetSize, iconTop + glyphTargetSize);
             mIcon.draw(canvas);
+            if (mIconSize > 0) {
+                mIcon.setBounds(0, 0, mIconSize, mIconSize);
+            } else {
+                mIcon.setBounds(prevBounds);
+            }
         }
     }
 
@@ -1567,32 +1893,13 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             glyphTargetSize = Math.round(Math.min(bgRectF.width(), bgRectF.height()) * 0.62f);
         }
 
-        boolean drewAdaptiveFg = false;
-        if (mSuperIconAdaptiveDrawable != null) {
-            Drawable fg = mSuperIconAdaptiveDrawable.getForeground();
-            if (fg != null) {
-                // AdaptiveIcon foreground has an intrinsic safe zone ratio of 72 / 108 = 1 / 1.5.
-                // Expanding outer bounds by 1.5x around the center ensures the visible glyph matches glyphTargetSize.
-                int fullFgSize = Math.round(glyphTargetSize * 1.5f);
-                int fgLeft = Math.round(bgRectF.centerX() - fullFgSize / 2f);
-                int fgTop = Math.round(bgRectF.centerY() - fullFgSize / 2f);
-                fg.setBounds(fgLeft, fgTop, fgLeft + fullFgSize, fgTop + fullFgSize);
-                fg.draw(canvas);
-                drewAdaptiveFg = true;
-            }
-        }
-
-        if (!drewAdaptiveFg) {
-            if (mIcon != null) {
-                int iconLeft = Math.round(bgRectF.centerX() - glyphTargetSize / 2f);
-                int iconTop = Math.round(bgRectF.centerY() - glyphTargetSize / 2f);
-                mIcon.setBounds(iconLeft, iconTop, iconLeft + glyphTargetSize, iconTop + glyphTargetSize);
-                mIcon.draw(canvas);
-            }
-        }
+        drawAppIconGlyph(canvas, bgRectF.centerX(), bgRectF.centerY(), glyphTargetSize);
     }
 
     protected void drawMultiSpanLabel(Canvas canvas) {
+        if (mIsDrawingDragView) {
+            return;
+        }
         if (hasQuickFunctions() && getSpanX() == 2 && getSpanY() == 2) {
             return;
         }
@@ -1618,14 +1925,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         if (cellPaddingY <= 0) {
             cellPaddingY = dp.getWorkspaceIconProfile().getCellYPaddingPx();
         }
-        if (cellPaddingY <= 0) {
-            int iconTextHeight = Utilities.calculateTextHeight(
-                    dp.getWorkspaceIconProfile().getIconTextSizePx());
-            int contentHeight = iconSize + iconPadding + iconTextHeight;
-            float yFactor = (dp.getDeviceProperties().isTablet()
-                    || dp.getDeviceProperties().isTwoPanels()
-                    || dp.isVerticalBarLayout()) ? 0.5f : 0.6666667f;
-            cellPaddingY = Math.round(Math.max(0, cellHeight - contentHeight) * yFactor);
+        if (cellPaddingY < 0) {
+            int cHeight = dp.getWorkspaceIconProfile().getCellHeightPx();
+            cellPaddingY = Math.max(0, (cellHeight - cHeight) / 2);
         }
 
         int standardIconLabelTop = targetRow * (cellHeight + borderSpace.y)
@@ -1650,6 +1952,12 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             drawMultiSpanLabel(canvas);
             drawDotIfNecessary(canvas);
             return;
+        }
+        if (mIcon != null && mIconSize > 0) {
+            Rect b = mIcon.getBounds();
+            if (b.left != 0 || b.top != 0 || b.width() != mIconSize || b.height() != mIconSize) {
+                mIcon.setBounds(0, 0, mIconSize, mIconSize);
+            }
         }
         super.onDraw(canvas);
         drawDotIfNecessary(canvas);
@@ -1917,11 +2225,11 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             int cellYPadding;
             if (mDisplay == DISPLAY_WORKSPACE) {
                 cellYPadding = mDeviceProfile.getWorkspaceIconProfile().getCellYPaddingPx();
-                if (cellYPadding <= 0) {
-                    float yFactor = (mDeviceProfile.getDeviceProperties().isTablet()
-                            || mDeviceProfile.getDeviceProperties().isTwoPanels()
-                            || mDeviceProfile.isVerticalBarLayout()) ? 0.5f : 0.6666667f;
-                    cellYPadding = Math.round(Math.max(0, (availableHeight - cellHeightPx) * yFactor));
+                if (cellYPadding < 0 || !shouldShowLabel()) {
+                    int cHeight = shouldShowLabel()
+                            ? mDeviceProfile.getWorkspaceIconProfile().getCellHeightPx()
+                            : mIconSize;
+                    cellYPadding = Math.max(0, (availableHeight - cHeight) / 2);
                 }
             } else {
                 cellYPadding = Math.max(0, (availableHeight - cellHeightPx) / 2);
@@ -2429,13 +2737,25 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     public SafeCloseable prepareDrawDragView() {
         resetIconScale();
         setForceHideDot(true);
+        mIsDrawingDragView = true;
         return () -> {
+            mIsDrawingDragView = false;
         };
     }
 
     private void resetIconScale() {
         if (mIcon != null) {
             mIcon.resetScale();
+        }
+        if (mSuperIconPressAnimator != null) {
+            mSuperIconPressAnimator.cancel();
+        }
+        mSuperIconPressScale = 1.0f;
+        for (int i = 0; i < mSlotPressScales.length; i++) {
+            if (mSlotPressAnimators[i] != null) {
+                mSlotPressAnimators[i].cancel();
+            }
+            mSlotPressScales[i] = 1.0f;
         }
     }
 

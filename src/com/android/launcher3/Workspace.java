@@ -1762,10 +1762,14 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             ItemInfo dragObject, DragPreviewProvider previewProvider, DragOptions dragOptions) {
 
         float iconScale = 1f;
-        if (child instanceof BubbleTextView) {
-            Drawable icon = ((BubbleTextView) child).getIcon();
-            if (icon instanceof FastBitmapDrawable) {
-                iconScale = ((FastBitmapDrawable) icon).getAnimatedScale();
+        if (child instanceof BubbleTextView btv) {
+            if (btv.isMultiSpan()) {
+                iconScale = btv.getSuperIconPressScale();
+            } else {
+                Drawable icon = btv.getIcon();
+                if (icon instanceof FastBitmapDrawable) {
+                    iconScale = ((FastBitmapDrawable) icon).getAnimatedScale();
+                }
             }
         }
 
@@ -2000,7 +2004,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
         boolean aboveShortcut = Folder.willAccept(dropOverView.getTag())
                 && ((ItemInfo) dropOverView.getTag()).container != CONTAINER_HOTSEAT_PREDICTION;
-        boolean willBecomeShortcut = FolderInfo.willAcceptItemType(info.itemType);
+        boolean willBecomeShortcut = info.spanX <= 1 && info.spanY <= 1
+                && FolderInfo.willAcceptItemType(info.itemType);
 
         return (aboveShortcut && willBecomeShortcut);
     }
@@ -2220,7 +2225,9 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                 ItemInfo item = d.dragInfo;
                 int minSpanX = spanX;
                 int minSpanY = spanY;
-                if (!collapseFolder && item.minSpanX > 0 && item.minSpanY > 0) {
+                if (!collapseFolder
+                        && (item instanceof LauncherAppWidgetInfo || item instanceof PendingAddWidgetInfo)
+                        && item.minSpanX > 0 && item.minSpanY > 0) {
                     minSpanX = item.minSpanX;
                     minSpanY = item.minSpanY;
                 }
@@ -2657,7 +2664,9 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             int spanY = collapseFolder ? 1 : item.spanY;
             int minSpanX = spanX;
             int minSpanY = spanY;
-            if (!collapseFolder && item.minSpanX > 0 && item.minSpanY > 0) {
+            if (!collapseFolder
+                    && (item instanceof LauncherAppWidgetInfo || item instanceof PendingAddWidgetInfo)
+                    && item.minSpanX > 0 && item.minSpanY > 0) {
                 minSpanX = item.minSpanX;
                 minSpanY = item.minSpanY;
             }

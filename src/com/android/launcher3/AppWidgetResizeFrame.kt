@@ -254,16 +254,14 @@ private class AppIconResizeTarget(
     }
 
     override fun onResizeApplied(spanX: Int, spanY: Int, committed: Boolean) {
-        icon.loadSuperIconDrawableIfNecessary()
-        icon.invalidate()
         if (committed) {
             itemInfoInternal.spanX = spanX
             itemInfoInternal.spanY = spanY
             itemInfoInternal.minSpanX = spanX
             itemInfoInternal.minSpanY = spanY
             workspace.mLauncher.modelWriter.updateItemInDatabase(itemInfoInternal)
-            icon.requestLayout()
         }
+        icon.onResizeChanged()
     }
 
     override fun getResizeAnnouncement(context: Context, spanX: Int, spanY: Int): CharSequence =
